@@ -8,6 +8,7 @@ agentic_flow/
 # Generated databases, run artifacts, and local results.
 *.duckdb
 *.duckdb.wal
+.ledgerbench/
 benchmark/results/local/
 *.jsonl.trace
 

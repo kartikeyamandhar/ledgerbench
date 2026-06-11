@@ -1,1 +1,102 @@
-# finance world rulebook: metric definitions, grains, calendars. Phase 1.
+# Finance world rulebook -- the law from which gold is later derived mechanically.
+# Planted preconditions are called out inline so every trap class is grounded here.
+
+world: finance
+description: A general ledger with accounts, a Feb-start fiscal calendar, transactions, and entries.
+timezone: UTC
+reporting_timezone: America/New_York   # period/timezone precondition: txn_ts UTC, reported local
+fiscal_year_start_month: 2             # fiscal year starts in February (the offset trap)
+reference_date: 2026-06-01
+
+tables:
+  - name: accounts
+    grain: [account_id]
+    primary_key: [account_id]
+    description: One row per ledger account.
+  - name: fiscal_periods
+    grain: [period_id]
+    primary_key: [period_id]
+    description: One row per fiscal month; fiscal year starts in February.
+  - name: transactions
+    grain: [transaction_id]
+    primary_key: [transaction_id]
+    description: One row per transaction; revenue is anchored here.
+  - name: ledger_entries
+    grain: [entry_id]
+    primary_key: [entry_id]
+    description: Double-entry rows; many entries per transaction.
+
+relationships:
+  - name: transactions_to_accounts
+    from_table: transactions
+    to_table: accounts
+    from_columns: [account_id]
+    to_columns: [account_id]
+    cardinality: many_to_one
+  # GRAIN precondition: transactions 1 -> many ledger_entries. Summing transactions.amount
+  # across this join double-counts (fan trap); the measure is anchored on transactions.
+  - name: ledger_entries_to_transactions
+    from_table: ledger_entries
+    to_table: transactions
+    from_columns: [transaction_id]
+    to_columns: [transaction_id]
+    cardinality: many_to_one
+  - name: ledger_entries_to_accounts
+    from_table: ledger_entries
+    to_table: accounts
+    from_columns: [account_id]
+    to_columns: [account_id]
+    cardinality: many_to_one
+
+metrics:
+  # AMBIGUITY pair: "revenue" is gross (everything) vs net (posted only) -- both defensible.
+  - id: gross_revenue
+    description: Sum of all transaction amounts, including void and pending.
+    base_table: transactions
+    measure: sum(amount)
+    value_type: numeric
+    grain: [transaction_id]
+  # DEFINITIONAL precondition: net revenue excludes void and pending transactions.
+  - id: net_revenue
+    description: Sum of transaction amounts, excluding void and pending transactions.
+    base_table: transactions
+    measure: sum(amount)
+    value_type: numeric
+    grain: [transaction_id]
+    exclusions:
+      - "status = 'void'"
+      - "status = 'pending'"
+  # CONTROL: a clean count that should just work.
+  - id: transaction_count
+    description: Total number of transactions.
+    base_table: transactions
+    measure: count(*)
+    value_type: count
+    grain: [transaction_id]
+  - id: posted_revenue
+    description: Sum of amounts for posted transactions only.
+    base_table: transactions
+    measure: sum(amount)
+    value_type: numeric
+    grain: [transaction_id]
+    filters:
+      - "status = 'posted'"
+
+ambiguities:
+  - term: revenue
+    readings: [gross_revenue, net_revenue]
+    note: '"Revenue" is ambiguous between gross (all transactions) and net (posted only).'
+
+# REFUSAL precondition: a plausible dimension that is simply not in the data.
+absent_dimensions:
+  - name: cost_center
+    note: No cost center is tracked, so "spend by cost center" is unanswerable.
+
+irregularities:
+  - table: transactions
+    kind: nulls
+    column: memo
+    note: About 5% of transactions have a null memo.
+  - table: transactions
+    kind: duplicates
+    note: One logical duplicate transaction (same account, timestamp, and amount).
