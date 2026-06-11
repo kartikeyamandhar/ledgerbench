@@ -1,0 +1,24 @@
+cff-version: 1.2.0
+title: "LedgerBench"
+message: "If you use LedgerBench in your research, please cite it."
+type: software
+authors:
+  - family-names: "Mandhar"
+    given-names: "Kartikeya"
+    # orcid: "https://orcid.org/0000-0000-0000-0000"  # TODO: add your ORCID
+abstract: >-
+  A benchmark and CLI that measures whether analytics agents are business-correct,
+  not merely execution-correct, across five axes: definitional correctness, grain
+  safety, ambiguity handling, refusal correctness, and explanation faithfulness.
+repository-code: "https://github.com/kartikeyamandhar/ledgerbench"
+url: "https://github.com/kartikeyamandhar/ledgerbench"
+license: Apache-2.0
+version: 0.0.1
+date-released: "2026-06-10"
+keywords:
+  - benchmark
+  - analytics
+  - large-language-models
+  - agents
+  - text-to-sql
+  - evaluation

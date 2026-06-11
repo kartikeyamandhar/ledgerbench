@@ -1,0 +1,55 @@
+# LedgerBench run configuration (example). Copy to ledgerbench.yaml and edit.
+# Values below are documented defaults; the schema is finalized in Phase 6.
+
+# Which suite of items to run, and against which world databases.
+suite: benchmark/items/public_v1.jsonl
+worlds:
+  build_seed: 42          # deterministic world generation seed
+  cache_dir: .ledgerbench/worlds
+
+# The agent under test. `adapter` is an installed entry point in the
+# `ledgerbench.adapters` group; `naive` is the offline, no-API-key baseline.
+agent:
+  adapter: naive
+  model: null             # e.g. "claude-..." or "gpt-..." for live adapters
+  endpoint: null          # OpenAI-compatible base URL for http_openai
+
+# Conditions to evaluate: closed book (schema only) and/or open book (+ rulebook).
+conditions: [closed, open]
+
+# Reproducibility: each item is run once per seed; report variance across seeds.
+repetitions:
+  seeds: [11, 22, 33]
+
+# Safety and spend rails enforced by the runner (see SECURITY.md).
+budget:
+  max_calls_per_item: 3
+  max_usd_per_run: 25.0
+  statement_timeout_s: 30
+  row_cap: 100000
+
+# Scoring tolerances. Reconciliation is relative unless an item overrides it;
+# integer count metrics require an exact match.
+tolerances:
+  relative: 0.005         # 0.5 percent
+  integer_exact: true
+
+# Per-axis weights for the aggregate roll-up. Printed in every report.
+weights:
+  definitional: 0.30
+  grain: 0.25
+  ambiguity: 0.15
+  refusal: 0.15
+  faithfulness: 0.15
+
+# Axis thresholds for the CI-gate behavior: a breach yields a nonzero exit code.
+thresholds:
+  definitional: 0.80
+  grain: 0.80
+  ambiguity: 0.70
+  refusal: 0.70
+  faithfulness: 0.70
+
+# Output.
+report:
+  out: benchmark/results/local/report.html
