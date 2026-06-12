@@ -67,8 +67,10 @@ ledgerbench demo          # ~35s: builds both worlds, runs the offline baseline,
 ```
 
 No API keys, no network. The demo runs the deterministic naive baseline over all 150
-items and renders the headline finding: on our machine, **100% of its queries ran fine
-and 9% of its answers were business-correct**. That gap is the benchmark's point.
+items and renders the headline finding — **100% of its queries ran fine, 9.3% of its
+answers were business-correct**:
+
+![The demo report: the gap chart and per-axis results](docs/assets/demo-report.png)
 
 Other commands: `ledgerbench run -c ledgerbench.yaml` (config-driven, exit code 1 on
 axis-threshold breach — the CI gate), `ledgerbench report` (re-render/re-score from
