@@ -6,6 +6,30 @@ Semantic Versioning. `v1.0.0` is reserved for the public launch (Phase 8).
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-06-12
+
+### Added
+
+- Phase 4 (Runner, adapters, safety): the security boundary. `runner/safety.py` —
+  `vet_sql` (parse, single statement, SELECT-only, structural denylist, comments
+  stripped) + `SafeExecutor` (timeout via interrupt timer, row cap, audit log).
+- Kill-test corpus: 30 malicious fixtures in `tests/fixtures/malicious_sql/`, each
+  asserted rejected **and** never executed (audit log empty). Permanent regression armor.
+- `adapters/base.py`: `AgentAdapter` ABC + `ledgerbench.adapters` entry-point discovery;
+  adapters get a gated, budget-counted `execute_sql` callback, never a DB handle.
+- `adapters/naive.py`: offline deterministic baseline (no key, no network) — the
+  adapter-in-100-lines worked example, now documented in CONTRIBUTING.md.
+- `adapters/http_openai.py` / `adapters/anthropic.py`: httpx-based provider adapters
+  with a sql_probe loop; mocked-transport tests; keys from env only, never logged.
+- `runner/executor.py`: seeds × items orchestration, transport-only retries with
+  backoff, streaming JSONL traces (no wall-clock — byte-identical reruns asserted),
+  RunManifest emission with latency/cost totals.
+- `runner/budget.py`: per-item call cap (fails the item) and run-level USD cap (clean
+  abort with a valid partial manifest).
+- `runner/trace.py`: deterministic TraceRecord + streaming writer/reader.
+- `.github/workflows/smoke.yml`: the 10-item offline eval on every PR, no secrets.
+- SECURITY.md rewritten around the three-layer model; CONTRIBUTING.md adapter guide.
+
 ## [0.3.0] - 2026-06-12
 
 ### Added
@@ -84,7 +108,8 @@ Semantic Versioning. `v1.0.0` is reserved for the public launch (Phase 8).
   `.claude/settings.json` (`includeCoAuthoredBy: false`).
 - Placeholder test: package imports and `__version__` matches installed metadata.
 
-[Unreleased]: https://github.com/kartikeyamandhar/ledgerbench/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/kartikeyamandhar/ledgerbench/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/kartikeyamandhar/ledgerbench/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/kartikeyamandhar/ledgerbench/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/kartikeyamandhar/ledgerbench/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/kartikeyamandhar/ledgerbench/compare/v0.0.1...v0.1.0

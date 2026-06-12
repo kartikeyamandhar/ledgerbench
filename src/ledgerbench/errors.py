@@ -27,3 +27,32 @@ class RulebookValidationError(RulebookError):
 
 class WorldBuildError(LedgerBenchError):
     """A world database could not be built from its schema and generator."""
+
+
+class SQLSafetyError(LedgerBenchError):
+    """Model-generated SQL was rejected by the safety gate.
+
+    Raised *before* execution: the offending statement never reaches DuckDB.
+    The message names the violated rule so traces and kill-tests can assert on
+    the reason, not just the refusal.
+    """
+
+
+class BudgetExceededError(LedgerBenchError):
+    """The run-level dollar cap was crossed; the executor aborts cleanly."""
+
+
+class CallBudgetExceededError(BudgetExceededError):
+    """One item used more gated SQL calls than its budget.
+
+    Scoped to the item: the executor records the failure and moves on, unlike
+    the run-level dollar cap, which aborts the whole run.
+    """
+
+
+class AdapterError(LedgerBenchError):
+    """An adapter failed in transport or protocol (not in answer quality).
+
+    Transport failures are retried with backoff; answer quality is never a
+    reason to raise -- a bad answer is scored, not retried.
+    """
