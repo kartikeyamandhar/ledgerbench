@@ -6,6 +6,33 @@ Semantic Versioning. `v1.0.0` is reserved for the public launch (Phase 8).
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-06-12
+
+### Added
+
+- Phase 5 (Item bank + faithfulness judge): `benchmark/items/public_v1.jsonl` — 150
+  hand-authored items, taxonomy-exact (definitional 40, grain 30, ambiguity 25,
+  refusal 20, period 15, control 20), spread across both worlds. Items carry gold
+  *recipes* (rulebook metric + optional `extra_where`), never baked values.
+- `gold/compiler.py`: recipe → mechanical SQL (filters + negated exclusions +
+  window) → scalar gold; `reference_date` substitution; every compiled query passes
+  the same safety gate as agent SQL; NULL/fractional-count gold is a defect, not a value.
+- `generator/suite.py`: `load_bank`, `suite_hash`, and `validate_items` — the linter
+  (unique ids, taxonomy counts, per-class preconditions declared in the world's
+  rulebook, world isolation, full gold recomputation). Runs in CI; 105 recipes
+  recompute in ~0.1 s against built worlds.
+- `ledgerbench validate` CLI: the same linter as a command with exit codes.
+- `scorer/faithfulness.py` (axis 5): deterministic sqlglot fact extraction (tables,
+  joins, filters, exclusions, date bounds, aggregates); LLM judge confined to
+  semantic match, double-run with agreement required (disagreement → `unknown`),
+  content-hash cached, prompt versioned; `na` (judge never runs) without assumptions.
+- Calibration set: 20 hand-labeled cases; CI pins extraction + plumbing;
+  `scripts/judge_calibration.py` measures live judge agreement (gate ≥ 0.8; requires
+  a key — pre-launch step).
+- Docs: `benchmark/items/README.md` (taxonomy, authoring guide, anti-subjectivity
+  argument), `docs/private-split.md` (the protocol, RT-004).
+
+
 ## [0.4.0] - 2026-06-12
 
 ### Added
@@ -108,7 +135,8 @@ Semantic Versioning. `v1.0.0` is reserved for the public launch (Phase 8).
   `.claude/settings.json` (`includeCoAuthoredBy: false`).
 - Placeholder test: package imports and `__version__` matches installed metadata.
 
-[Unreleased]: https://github.com/kartikeyamandhar/ledgerbench/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/kartikeyamandhar/ledgerbench/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/kartikeyamandhar/ledgerbench/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/kartikeyamandhar/ledgerbench/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/kartikeyamandhar/ledgerbench/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/kartikeyamandhar/ledgerbench/compare/v0.1.0...v0.2.0
