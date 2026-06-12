@@ -6,6 +6,26 @@ Semantic Versioning. `v1.0.0` is reserved for the public launch (Phase 8).
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-06-12
+
+### Added
+
+- Phase 3 (Static grain checker): `scorer/grain_check.py` decides — without executing —
+  whether agent SQL inflates an aggregate through a join. Verdicts: `safe`, `unsafe`
+  (offending join path + aggregate in evidence), `needs_distinct`, `unknown`.
+- Fan-out model: equi-join edges oriented one→many from declared GrainModel
+  cardinalities; per-source BFS over the join tree catches fan traps, chasm traps, and
+  dimension measures summed across fact joins; pre-aggregation repairs recognized.
+- Fail-closed fence (ADR-0004): unsupported constructs return `unknown` naming the
+  construct — RIGHT/FULL/CROSS joins, USING, non-equi joins, window functions, set ops,
+  nesting beyond one level, undeclared relationships, cyclic join graphs, and more.
+- Labeled corpus (47 queries) with precision printed on every run and gated in CI:
+  measured TPR 1.000, FPR 0.000, unknown rate 0.255; mean analysis < 50 ms/query.
+- `empirical_inflation` helper: execution-based corroboration (secondary evidence only);
+  `grain_axis_result` maps verdicts onto the scorer axis vocabulary.
+- Docs: ADR-0004, the $100→$300 worked example and measured precision in
+  `docs/architecture.md`.
+
 ## [0.2.0] - 2026-06-12
 
 ### Added
@@ -64,7 +84,8 @@ Semantic Versioning. `v1.0.0` is reserved for the public launch (Phase 8).
   `.claude/settings.json` (`includeCoAuthoredBy: false`).
 - Placeholder test: package imports and `__version__` matches installed metadata.
 
-[Unreleased]: https://github.com/kartikeyamandhar/ledgerbench/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/kartikeyamandhar/ledgerbench/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/kartikeyamandhar/ledgerbench/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/kartikeyamandhar/ledgerbench/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/kartikeyamandhar/ledgerbench/compare/v0.0.1...v0.1.0
 [0.0.1]: https://github.com/kartikeyamandhar/ledgerbench/releases/tag/v0.0.1
