@@ -13,7 +13,12 @@ import os
 import httpx
 
 from ledgerbench.adapters.base import AgentAdapter, ExecuteSql
-from ledgerbench.adapters.http_openai import SYSTEM_PROMPT, _extract_probe, _run_probe
+from ledgerbench.adapters.http_openai import (
+    SYSTEM_PROMPT,
+    _extract_payload,
+    _extract_probe,
+    _run_probe,
+)
 from ledgerbench.contracts.agent_io import AgentRequest
 from ledgerbench.errors import AdapterError
 
@@ -61,10 +66,18 @@ class AnthropicAdapter(AgentAdapter):
                 text = self._message(client, api_key, messages)
                 probe = _extract_probe(text)
                 if probe is None:
-                    return text
+                    return _extract_payload(text)
                 messages.append({"role": "assistant", "content": text})
                 messages.append({"role": "user", "content": _run_probe(probe, execute_sql)})
-            return text
+            # Probes exhausted with no final answer yet: demand it in one last
+            # turn (folded into the final probe-result message so roles still
+            # alternate). SQL calls stay capped by the gated callback.
+            messages[-1]["content"] += (
+                "\n\nProbe budget exhausted -- no more queries are available. "
+                "Reply now with ONLY the final JSON object (no sql_probe, no prose)."
+            )
+            text = self._message(client, api_key, messages)
+            return _extract_payload(text)
         finally:
             if self._client is None:
                 client.close()

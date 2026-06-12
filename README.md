@@ -28,16 +28,23 @@ answer was right" across five axes — and ships the chart that shows it.
 - **Demo / benchmark** — a bundled deterministic fake company where every true answer is known by construction. The public benchmark.
 - **BYO** — point the engine at a real dbt project, auto-generate the adversarial suite from your declared semantics, compute gold read-only, and grade your agent.
 
-## The finding (v1.0, floor tier)
+## The finding
 
-On the 150-item public bank, the deterministic offline baseline's queries **ran fine
-100% of the time and were business-correct 9.3% of the time** — identically in closed
-and open book, because the floor doesn't read documentation
-([committed manifests](benchmark/results/)). Execution success and business
-correctness are different quantities; this benchmark measures the distance for real
-agents. Frontier-agent rows (Anthropic/OpenAI × closed/open × 3 seeds) land via
-`scripts/run_benchmark.py` once API keys are configured — nothing is projected in
-advance. **Leaderboard:** https://kartikeyamandhar.github.io/ledgerbench/ ·
+Every agent tested executes flawlessly; none is reliably business-correct — and the
+business rulebook helps without coming close to closing the gap
+([committed manifests](benchmark/results/)):
+
+| agent | ran fine | business-correct (closed book) | business-correct (open book) |
+|---|---|---|---|
+| naive floor | 100% | 9.3% | 9.3% |
+| claude-haiku-4-5 ¹ | 100% | 38.0% | 44.0% |
+| gpt-4o-mini | 100% | 42.0% | **59.3%** |
+
+The open-book residual — **two in five answers still wrong with the rulebook in hand,
+on queries that all ran cleanly** — is the argument for verification beyond
+documentation. ¹ single seed (credit-constrained); see the report for the
+contract-binding analysis of haiku's open-book malformed cluster.
+**Leaderboard:** https://kartikeyamandhar.github.io/ledgerbench/ ·
 **Technical report:** [docs/report.md](docs/report.md)
 
 ## Status

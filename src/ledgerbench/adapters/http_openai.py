@@ -40,15 +40,18 @@ come back as the next message. You have a limited number of probes.
 
 Your FINAL reply must be ONLY a JSON object with these fields:
   action: "answer" | "clarify" | "refuse"
-  value: number or null        (the single numeric answer, when action=answer)
-  sql: string or null          (the one SELECT that produces value)
+  value: number                (REQUIRED when action=answer: run your SQL via a
+                                probe to compute the actual number first -- an
+                                answer without a value scores zero)
+  sql: string                  (the one SELECT that produces value)
   assumptions: array of short strings stating choices you made
   clarifying_question: string or null  (when the question is ambiguous, name the ambiguous term)
   refusal_reason: string or null       (when unanswerable, name the missing column/dimension)
   confidence: number in [0,1]
 
 Clarify when the question is genuinely ambiguous. Refuse when the schema cannot
-answer it, naming what is missing. No prose outside the JSON object.
+answer it, naming what is missing. No prose outside the JSON object, and do NOT
+wrap the JSON in markdown code fences.
 """
 
 
@@ -93,10 +96,18 @@ class OpenAIAdapter(AgentAdapter):
                 text = self._chat(client, api_key, messages)
                 probe = _extract_probe(text)
                 if probe is None:
-                    return text
+                    return _extract_payload(text)
                 messages.append({"role": "assistant", "content": text})
                 messages.append({"role": "user", "content": _run_probe(probe, execute_sql)})
-            return text  # probes exhausted; whatever came last is the answer
+            # Probes exhausted with no final answer yet: demand it in one last
+            # turn (folded into the final probe-result message so roles still
+            # alternate). SQL calls stay capped by the gated callback.
+            messages[-1]["content"] += (
+                "\n\nProbe budget exhausted -- no more queries are available. "
+                "Reply now with ONLY the final JSON object (no sql_probe, no prose)."
+            )
+            text = self._chat(client, api_key, messages)
+            return _extract_payload(text)
         finally:
             if self._client is None:
                 client.close()
@@ -127,10 +138,63 @@ class OpenAIAdapter(AgentAdapter):
         return str(content)
 
 
-def _extract_probe(text: str) -> str | None:
-    """Return the probe SQL when the reply is exactly a sql_probe object."""
+def _strip_fences(text: str) -> str:
+    """Remove a markdown code fence wrapper, if present (transport noise).
+
+    Models often wrap JSON in ```json fences despite instructions. Unwrapping
+    is the adapter's job -- making the agent speak the contract -- and is not
+    validation: whatever is inside still stands or falls on its own.
+    """
+    stripped = text.strip()
+    if stripped.startswith("```"):
+        first_newline = stripped.find("\n")
+        if first_newline != -1 and stripped.endswith("```"):
+            return stripped[first_newline + 1 : -3].strip()
+    return stripped
+
+
+def _extract_payload(text: str) -> str:
+    """Pull the contract JSON out of the model's transport text.
+
+    Models wrap payloads in fences and prefix prose despite instructions.
+    Unwrapping is the adapter's job (speak the contract); the extracted object
+    still stands or falls on its own under ``parse_agent_response``. Strategy:
+    fence-strip; if the result parses as JSON, done; otherwise scan for the
+    first balanced ``{...}`` block that parses. If nothing parses, return the
+    fence-stripped text -- which will be judged malformed, correctly.
+    """
+    stripped = _strip_fences(text)
     try:
-        payload = json.loads(text)
+        json.loads(stripped)
+    except (json.JSONDecodeError, TypeError):
+        pass
+    else:
+        return stripped
+
+    start = stripped.find("{")
+    while start != -1:
+        depth = 0
+        for index in range(start, len(stripped)):
+            char = stripped[index]
+            if char == "{":
+                depth += 1
+            elif char == "}":
+                depth -= 1
+                if depth == 0:
+                    candidate = stripped[start : index + 1]
+                    try:
+                        json.loads(candidate)
+                    except json.JSONDecodeError:
+                        break
+                    return candidate
+        start = stripped.find("{", start + 1)
+    return stripped
+
+
+def _extract_probe(text: str) -> str | None:
+    """Return the probe SQL when the reply's payload is a sql_probe object."""
+    try:
+        payload = json.loads(_extract_payload(text))
     except (json.JSONDecodeError, TypeError):
         return None
     if isinstance(payload, dict) and set(payload) == {"sql_probe"}:
@@ -140,11 +204,18 @@ def _extract_probe(text: str) -> str | None:
 
 
 def _run_probe(sql: str, execute_sql: ExecuteSql) -> str:
-    """Run one probe through the gate; render rows (or the refusal) as text."""
+    """Run one probe through the gate; render rows (or the failure) as text.
+
+    Any failure -- a safety rejection or an engine error from hallucinated
+    columns/tables -- is feedback for the model, never an exception for the
+    host: the agent gets to read its own mistake and try again.
+    """
     try:
         rows = execute_sql(sql)
     except LedgerBenchError as exc:
         return f"Query rejected: {exc}"
+    except Exception as exc:  # engine errors are agent feedback, never host crashes
+        return f"Query failed: {str(exc)[:300]}"
     rendered = "\n".join(str(row) for row in rows[:50])
     suffix = f"\n... ({len(rows)} rows total)" if len(rows) > 50 else ""
     return f"Result rows:\n{rendered or '(no rows)'}{suffix}"

@@ -8,6 +8,7 @@ Resumable: existing result directories with a manifest are skipped.
 from __future__ import annotations
 
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -26,12 +27,35 @@ from ledgerbench.scorer.pipeline import score_run
 from ledgerbench.worlds import WORLDS_DIR, build_world, digest_database
 
 SUITE = Path("benchmark/items/public_v1.jsonl")
-SEEDS = (11, 22, 33)
+DEFAULT_SEEDS = (11, 22, 33)
 WORLD_SEED = 42
 
 
-def run_roster(agents: list[str], conditions: list[str], out_root: Path) -> None:
-    """Run each agent x condition over the public bank; write committed-style results."""
+def _parse_spec(spec: str) -> tuple[str, str | None]:
+    """Split an 'adapter' or 'adapter:model' roster spec."""
+    name, _, model = spec.partition(":")
+    return name, (model or None)
+
+
+def _slug(model: str) -> str:
+    return model.replace(":", "-").replace(".", "-").replace("/", "-")
+
+
+def run_roster(
+    agents: list[str],
+    conditions: list[str],
+    out_root: Path,
+    *,
+    use_judge: bool = False,
+    max_usd_per_run: float = 30.0,
+    seeds: tuple[int, ...] = DEFAULT_SEEDS,
+) -> None:
+    """Run each roster spec x condition over the public bank.
+
+    Specs are ``adapter`` or ``adapter:model`` (e.g. ``anthropic:claude-haiku-
+    4-5-20251001``). With ``use_judge`` (requires ANTHROPIC_API_KEY and a
+    passed calibration), faithfulness is scored live: double-run, cached.
+    """
     items = load_bank(SUITE)
     worlds = sorted({i.world for i in items})
     db_paths = {w: build_world(w, seed=WORLD_SEED) for w in worlds}
@@ -45,27 +69,44 @@ def run_roster(agents: list[str], conditions: list[str], out_root: Path) -> None
     reference_dates = {w: rb.reference_date for w, rb in rulebooks.items()}
     world_hashes = {w: digest_database(p) for w, p in db_paths.items()}
 
-    for agent_name in agents:
+    judge = None
+    judge_label = "not evaluated (offline)"
+    if use_judge:
+        from ledgerbench.scorer.faithfulness import AnthropicJudge, CachingJudge
+
+        judge = CachingJudge(AnthropicJudge(), cache_dir=Path(".ledgerbench/judge_cache"))
+        judge_label = "claude-haiku double-run, cached (calibration agreement 0.90)"
+
+    for spec_str in agents:
+        agent_name, model = _parse_spec(spec_str)
+        label = f"{agent_name}:{model}" if model else agent_name
         for condition in conditions:
-            out_dir = out_root / f"{agent_name}-{condition}"
+            dir_name = (
+                f"{agent_name}-{_slug(model)}-{condition}" if model else f"{agent_name}-{condition}"
+            )
+            out_dir = out_root / dir_name
             if (out_dir / "manifest.json").is_file():
                 print(f"skip {out_dir} (manifest exists; resume semantics)")
                 continue
             out_dir.mkdir(parents=True, exist_ok=True)
-            print(f"== {agent_name} / {condition} ==")
+            print(f"== {label} / {condition} ==")
             spec = RunSpec(
                 db_paths=db_paths,
                 schema_ddls=schema_ddls,
                 context_packs=context_packs,
                 condition=condition,  # type: ignore[arg-type]
-                seeds=SEEDS,
+                seeds=seeds,
                 trace_path=out_dir / "traces.jsonl",
                 suite_version="public_v1",
                 suite_hash=suite_hash(SUITE),
                 world_hashes=world_hashes,
             )
             adapter = load_adapter(agent_name)
-            manifest = run_items(items, adapter, spec, BudgetTracker(max_usd_per_run=150.0))
+            if model is not None:
+                adapter.model = model  # provider adapters expose this knob
+            manifest = run_items(
+                items, adapter, spec, BudgetTracker(max_usd_per_run=max_usd_per_run)
+            )
             (out_dir / "manifest.json").write_text(
                 manifest.model_dump_json(indent=2) + "\n", encoding="utf-8"
             )
@@ -80,9 +121,13 @@ def run_roster(agents: list[str], conditions: list[str], out_root: Path) -> None
                     grain_models=grain_models,
                     connections=connections,
                     reference_dates=reference_dates,
-                    judge=None,
+                    judge=judge,
                 )
-                weights = {k: v for k, v in DEFAULT_WEIGHTS.items() if k != "faithfulness"}
+                weights = (
+                    dict(DEFAULT_WEIGHTS)
+                    if judge is not None
+                    else {k: v for k, v in DEFAULT_WEIGHTS.items() if k != "faithfulness"}
+                )
                 score = aggregate(verdicts, weights)
                 result = render_report(
                     items,
@@ -93,7 +138,7 @@ def run_roster(agents: list[str], conditions: list[str], out_root: Path) -> None
                     reference_dates=reference_dates,
                     weights=DEFAULT_WEIGHTS,
                     thresholds=DEFAULT_THRESHOLDS,
-                    judge_configured=False,
+                    judge_configured=judge is not None,
                     out_path=out_dir / "report.html",
                 )
             finally:
@@ -101,7 +146,7 @@ def run_roster(agents: list[str], conditions: list[str], out_root: Path) -> None
                     con.close()
 
             summary = {
-                "agent": agent_name,
+                "agent": label,
                 "condition": condition,
                 "suite_hash": spec.suite_hash,
                 "items": manifest.totals.items,
@@ -109,7 +154,7 @@ def run_roster(agents: list[str], conditions: list[str], out_root: Path) -> None
                 "business_correct": result.extra["business_correct"],
                 "overall_weighted": result.overall,
                 "per_axis": {a: s.rate for a, s in score.per_axis.items()},
-                "judge": "not evaluated (offline)",
+                "judge": judge_label,
                 "cost_usd": manifest.totals.cost_usd,
             }
             (out_dir / "summary.json").write_text(
@@ -119,5 +164,20 @@ def run_roster(agents: list[str], conditions: list[str], out_root: Path) -> None
 
 
 if __name__ == "__main__":
-    out = Path(sys.argv[1]) if len(sys.argv) > 1 else Path("/tmp/bench_results")
-    run_roster(["naive"], ["closed", "open"], out)
+    args = sys.argv[1:]
+    seeds = DEFAULT_SEEDS
+    cap = 30.0
+    if "--seeds" in args:
+        i = args.index("--seeds")
+        seeds = tuple(int(s) for s in args[i + 1].split(","))
+        del args[i : i + 2]
+    if "--max-usd" in args:
+        i = args.index("--max-usd")
+        cap = float(args[i + 1])
+        del args[i : i + 2]
+    out = Path(args[0]) if args else Path("benchmark/results")
+    roster = args[1:] or ["naive"]
+    use_judge = bool(os.environ.get("ANTHROPIC_API_KEY"))
+    run_roster(
+        roster, ["closed", "open"], out, use_judge=use_judge, max_usd_per_run=cap, seeds=seeds
+    )

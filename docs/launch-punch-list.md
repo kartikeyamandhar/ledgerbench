@@ -3,13 +3,13 @@
 Everything below needs a credential or account only the owner holds. Each item is
 ready to execute as written; nothing else in the launch blocks on them.
 
-## 1. API keys (enables the live judge + frontier benchmark runs)
+## 1. API keys — DONE 2026-06-12
 
 ```bash
 cp .env.example .env        # then paste real keys; gitignored + gitleaks-guarded
 ```
 
-## 2. Live judge calibration (RT-014 — required before quoting faithfulness numbers)
+## 2. Live judge calibration — DONE 2026-06-12: agreement 0.90 (gate 0.80)
 
 ```bash
 source agentic_flow/bin/activate
@@ -17,7 +17,7 @@ python scripts/judge_calibration.py     # prints agreement; gate >= 0.80
 ```
 Record the measured agreement in `docs/architecture.md` and `docs/report.md`.
 
-## 3. Frontier benchmark runs (the A/B finding; budget hard-capped at $150)
+## 3. Frontier benchmark runs — small-model tier DONE 2026-06-12 (haiku-4-5 + gpt-4o-mini, $1.62; sonnet-4-6/gpt-4o still pending more credits)
 
 Edit the roster at the bottom of `scripts/run_benchmark.py`
 (e.g. `["naive", "anthropic", "http_openai"]`), pick models via

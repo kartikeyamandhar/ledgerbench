@@ -1,0 +1,18 @@
+{
+  "agent": "http_openai:gpt-4o-mini",
+  "business_correct": 0.5933333333333334,
+  "condition": "open",
+  "cost_usd": 0.194205,
+  "items": 450,
+  "judge": "claude-haiku double-run, cached (calibration agreement 0.90)",
+  "overall_weighted": 0.5874512277251326,
+  "per_axis": {
+    "ambiguity": 0.2857142857142857,
+    "definitional": 0.5650793650793651,
+    "faithfulness": 0.40441176470588236,
+    "grain": 0.7872340425531915,
+    "refusal": 0.784
+  },
+  "ran_fine": 1.0,
+  "suite_hash": "da57177f1e72fb34"
+}

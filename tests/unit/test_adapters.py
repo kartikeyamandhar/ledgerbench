@@ -189,3 +189,34 @@ def test_probe_rejection_is_reported_to_the_model(monkeypatch) -> None:
     client = httpx.Client(transport=httpx.MockTransport(handler))
     OpenAIAdapter(client=client).complete(_request("q"), execute)
     assert any("Query rejected" in m["content"] for m in seen_messages[-1])
+
+
+def test_markdown_fences_are_stripped_as_transport_noise() -> None:
+    from ledgerbench.adapters.http_openai import _strip_fences
+
+    fenced = '```json\n{"action": "refuse", "refusal_reason": "no cost center"}\n```'
+    assert _strip_fences(fenced) == '{"action": "refuse", "refusal_reason": "no cost center"}'
+    assert _strip_fences('{"a": 1}') == '{"a": 1}'  # unfenced passes through
+    assert _strip_fences("```\nplain\n```") == "plain"
+
+
+def test_prose_wrapped_json_payload_is_extracted() -> None:
+    from ledgerbench.adapters.http_openai import _extract_payload, _extract_probe
+
+    prose = 'Let me think about this.\n\n{"sql_probe": "SELECT 1"}\nThanks!'
+    assert _extract_probe(prose) == "SELECT 1"
+    final = 'Here is my answer:\n```json\n{"action": "answer", "value": 5, "sql": "SELECT 5"}\n```'
+    assert _extract_payload(final) == '{"action": "answer", "value": 5, "sql": "SELECT 5"}'
+    assert _extract_payload("no json here at all") == "no json here at all"
+
+
+def test_probe_engine_errors_are_feedback_not_crashes() -> None:
+    """A hallucinated column raises a duckdb error; the model must see it as text."""
+    from ledgerbench.adapters.http_openai import _run_probe
+
+    def exploding(sql: str) -> list[tuple[object, ...]]:
+        raise RuntimeError('Binder Error: Referenced column "currency" not found')
+
+    reply = _run_probe("SELECT currency FROM orders", exploding)
+    assert reply.startswith("Query failed:")
+    assert "currency" in reply
