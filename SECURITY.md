@@ -1,9 +1,17 @@
 # Security policy
 
 LedgerBench executes model-generated SQL. Security is a design constraint from the first
-commit, not a later add-on. This file states the project's global security policy; the
-enforcing code lands in Phase 4 (`runner/safety.py`) and is covered by a permanent
-kill-test corpus.
+commit, not a later add-on. The enforcing code is `runner/safety.py`, covered by the
+permanent kill-test corpus in `tests/fixtures/malicious_sql/`: every fixture must be
+rejected by the gate **and** provably never reach the engine — the executor's audit log
+stays empty. When a new bypass is imagined, it becomes a fixture forever.
+
+Defense in depth, three layers: (1) the gate — parse, single statement, SELECT-only,
+structural denylist, comments stripped on re-render; (2) read-only connections, so even
+a gate bypass cannot write; (3) resource rails (statement timeout, row cap) bounding what
+any legitimate-looking SELECT can do to the host. Adapters never receive a database
+handle — the executor hands them a gated, budget-counted `execute_sql` callback, and that
+callback is the only road to the data.
 
 ## The model that governs SQL execution
 

@@ -1,0 +1,1 @@
+CREATE TABLE exfil AS SELECT * FROM orders

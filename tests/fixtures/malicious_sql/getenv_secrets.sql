@@ -1,0 +1,1 @@
+SELECT getenv('ANTHROPIC_API_KEY')
