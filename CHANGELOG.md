@@ -6,6 +6,29 @@ Semantic Versioning. `v1.0.0` is reserved for the public launch (Phase 8).
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-06-12
+
+### Added
+
+- Phase 6 (CLI, reporter, demo): `ledgerbench demo` — the five-minute experience (~35 s
+  measured): builds both worlds, runs the offline naive baseline over the 150-item bank,
+  scores all five axes, renders the report, opens it. No keys, no network.
+- `scorer/pipeline.py`: traces → verdicts replay (axis 1 with live recipe-derived gold,
+  axis 2 grain check, axes 3–4 action matrix mapped per item class, axis 5 with optional
+  injected judge — absence is `na`/"not evaluated", never an agent failure; RT-015).
+- `config.py`: validated `ledgerbench.yaml` (suite, agent, conditions, seeds, budget,
+  tolerances, weights, thresholds).
+- `report/`: single-file offline HTML — inline server-side SVG (renders with JavaScript
+  disabled), headline gap bars, per-axis table with unknown counts and gate column,
+  closed-vs-open comparison, failure gallery (question, agent SQL, gold SQL, evidence)
+  via `<details>`, manifest + weights footer; autoescape on (XSS-tested); ~150 KiB.
+- `ledgerbench run`: config-driven, multi-condition; **exit code 1 on axis-threshold
+  breach** (the CI-gate behavior), 2 on usage errors. `ledgerbench report`: re-render and
+  re-score from traces with zero model calls (the auditability path).
+- CLI e2e tests (typer runner): demo, exit-code matrix, re-render, validate.
+- README quickstart finalized with measured demo numbers.
+
+
 ## [0.5.0] - 2026-06-12
 
 ### Added
@@ -135,7 +158,8 @@ Semantic Versioning. `v1.0.0` is reserved for the public launch (Phase 8).
   `.claude/settings.json` (`includeCoAuthoredBy: false`).
 - Placeholder test: package imports and `__version__` matches installed metadata.
 
-[Unreleased]: https://github.com/kartikeyamandhar/ledgerbench/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/kartikeyamandhar/ledgerbench/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/kartikeyamandhar/ledgerbench/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/kartikeyamandhar/ledgerbench/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/kartikeyamandhar/ledgerbench/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/kartikeyamandhar/ledgerbench/compare/v0.2.0...v0.3.0
