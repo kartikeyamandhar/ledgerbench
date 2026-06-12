@@ -84,6 +84,43 @@ tolerance monotonicity, boundedness, parser never raises). The scorer core carri
 CI-enforced 100% branch-coverage gate (`make cov-core`). Rules in
 [ADR-0003](decisions/ADR-0003.md).
 
+## The grain checker (Phase 3)
+
+**The worked example.** An order worth $100 ships in 3 boxes. `orders` is one row per
+order; `shipments` is one row per box, with `shipments.order_id → orders.order_id`
+declared `many_to_one`. An agent answering "total revenue" writes:
+
+```sql
+SELECT sum(o.amount)
+FROM orders o JOIN shipments s ON o.order_id = s.order_id;
+```
+
+The join result has one row per *shipment*, so the $100 order appears three times and
+the query returns **$300**. It executes cleanly; it is business-wrong. The checker flags
+it `unsafe` with evidence `orders -> shipments (one_to_many)` and the offending
+aggregate `SUM(o.amount)` — statically, without executing anything.
+
+**How it decides** (`scorer/grain_check.py`): parse (sqlglot, duckdb dialect) → resolve
+scopes (aliases, CTEs, derived tables) → build the equi-join graph, orienting each edge
+one→many from the declared `GrainModel` cardinalities → a source's rows are duplicated
+exactly when a BFS away from it crosses an edge in the one→many direction (this one rule
+catches fan traps, chasm traps, and dimension measures summed across fact joins, while
+star/snowflake rollups stay clean) → classify each aggregate: SUM/AVG of a duplicated
+source is `unsafe`; COUNT of one is `needs_distinct`; MIN/MAX are duplicate-insensitive;
+COUNT(*) is unsafe only when no source is duplicate-free. Pre-aggregating the many side
+(GROUP BY or DISTINCT to the join key) is recognized as the repair and flips the verdict
+to `safe`.
+
+**The fence (fail closed, ADR-0004).** Supported: single SELECT, INNER/LEFT equi-joins,
+GROUP BY/HAVING, SUM/AVG/COUNT/MIN/MAX, one level of CTE/derived-table/WHERE-subquery
+nesting. Everything else returns `unknown` naming the construct — never a guess.
+
+**Measured precision** (the labeled corpus in `tests/golden/grain/`, printed by the test
+suite on every run): corpus 47 queries (15 traps, 20 clean, 12 out-of-fence) —
+**TPR 1.000, FPR 0.000, unknown rate 0.255**; gates asserted in CI are TPR ≥ 0.90 and
+FPR ≤ 0.05. Mean analysis time is well under the 50 ms/query budget. An execution-based
+helper (`empirical_inflation`) corroborates verdicts in tests — secondary evidence only.
+
 ## Module map
 
 Phase 0 scaffolds the full module tree under `src/ledgerbench/` as docstring-only stubs.

@@ -1,0 +1,313 @@
+# Labeled grain-safety corpus. Each query is hand-labeled against the declared
+# grain models of the saas/finance worlds. This corpus is the checker's spec:
+# TPR (traps caught), FPR (clean queries flagged), and the unknown rate are
+# computed from it and printed by the test. Labels: safe | unsafe |
+# needs_distinct | unknown.
+
+# ---------------------------------------------------------------- clean (safe)
+- name: simple_sum_no_join
+  world: saas
+  expect: safe
+  sql: SELECT sum(amount) FROM orders WHERE status = 'completed'
+
+- name: avg_single_table
+  world: saas
+  expect: safe
+  sql: SELECT avg(amount) FROM orders
+
+- name: count_rows_single_table
+  world: saas
+  expect: safe
+  sql: SELECT count(*) FROM orders
+
+- name: dimension_join_group_by          # fact->dim m:1; dim fans, measure does not
+  world: saas
+  expect: safe
+  sql: >
+    SELECT c.region, sum(o.amount) FROM orders o
+    JOIN customers c ON o.customer_id = c.customer_id GROUP BY c.region
+
+- name: dimension_left_join
+  world: saas
+  expect: safe
+  sql: >
+    SELECT c.plan, sum(o.amount) FROM orders o
+    LEFT JOIN customers c ON o.customer_id = c.customer_id GROUP BY c.plan
+
+- name: shipments_per_order              # aggregate on the many side is fine
+  world: saas
+  expect: safe
+  sql: >
+    SELECT o.order_id, count(s.shipment_id) FROM orders o
+    JOIN shipments s ON o.order_id = s.order_id GROUP BY o.order_id
+
+- name: events_per_user
+  world: saas
+  expect: safe
+  sql: >
+    SELECT u.user_id, count(e.event_id) FROM users u
+    JOIN events e ON u.user_id = e.user_id GROUP BY u.user_id
+
+- name: snowflake_three_level            # events->users->customers, all toward one
+  world: saas
+  expect: safe
+  sql: >
+    SELECT c.region, count(e.event_id) FROM events e
+    JOIN users u ON e.user_id = u.user_id
+    JOIN customers c ON u.customer_id = c.customer_id GROUP BY c.region
+
+- name: preagg_cte_repair                # many side grouped to the join key first
+  world: saas
+  expect: safe
+  sql: >
+    WITH ship AS (SELECT order_id, count(*) AS n FROM shipments GROUP BY order_id)
+    SELECT sum(o.amount) FROM orders o JOIN ship ON o.order_id = ship.order_id
+
+- name: preagg_distinct_derived_repair
+  world: saas
+  expect: safe
+  sql: >
+    SELECT sum(o.amount) FROM orders o
+    JOIN (SELECT DISTINCT order_id FROM shipments) s ON o.order_id = s.order_id
+
+- name: count_distinct_over_fan          # DISTINCT collapses the duplication
+  world: saas
+  expect: safe
+  sql: >
+    SELECT count(DISTINCT o.order_id) FROM orders o
+    JOIN shipments s ON o.order_id = s.order_id
+
+- name: minmax_over_fan                  # MIN/MAX are duplicate-insensitive
+  world: saas
+  expect: safe
+  sql: SELECT max(o.amount) FROM orders o JOIN shipments s ON o.order_id = s.order_id
+
+- name: where_in_subquery
+  world: saas
+  expect: safe
+  sql: >
+    SELECT sum(amount) FROM orders
+    WHERE customer_id IN (SELECT customer_id FROM customers WHERE region = 'EU')
+
+- name: quoted_identifiers_clean
+  world: saas
+  expect: safe
+  sql: >
+    SELECT "c"."region", sum("o"."amount") FROM "orders" AS "o"
+    JOIN "customers" AS "c" ON "o"."customer_id" = "c"."customer_id" GROUP BY "c"."region"
+
+- name: having_clause
+  world: saas
+  expect: safe
+  sql: >
+    SELECT c.region, sum(o.amount) FROM orders o
+    JOIN customers c ON o.customer_id = c.customer_id
+    GROUP BY c.region HAVING sum(o.amount) > 1000
+
+- name: subscriptions_dim_count
+  world: saas
+  expect: safe
+  sql: >
+    SELECT c.region, count(s.subscription_id) FROM subscriptions s
+    JOIN customers c ON s.customer_id = c.customer_id GROUP BY c.region
+
+- name: count_star_fact_dim              # result grain is orders: well-defined
+  world: saas
+  expect: safe
+  sql: SELECT count(*) FROM orders o JOIN customers c ON o.customer_id = c.customer_id
+
+- name: finance_net_revenue
+  world: finance
+  expect: safe
+  sql: SELECT sum(amount) FROM transactions WHERE status = 'posted'
+
+- name: finance_dim_join
+  world: finance
+  expect: safe
+  sql: >
+    SELECT a.account_type, sum(t.amount) FROM transactions t
+    JOIN accounts a ON t.account_id = a.account_id GROUP BY a.account_type
+
+- name: finance_entries_per_txn
+  world: finance
+  expect: safe
+  sql: >
+    SELECT t.transaction_id, sum(l.debit) FROM transactions t
+    JOIN ledger_entries l ON t.transaction_id = l.transaction_id
+    GROUP BY t.transaction_id
+
+# ------------------------------------------------------------ fan traps (unsafe)
+- name: canonical_fan_sum                # the $100 order x 3 shipments = $300
+  world: saas
+  expect: unsafe
+  paths: ["orders -> shipments"]
+  sql: SELECT sum(o.amount) FROM orders o JOIN shipments s ON o.order_id = s.order_id
+
+- name: fan_left_join                    # LEFT does not repair multiplication
+  world: saas
+  expect: unsafe
+  sql: SELECT sum(o.amount) FROM orders o LEFT JOIN shipments s ON o.order_id = s.order_id
+
+- name: fan_avg                          # duplicated rows shift the mean too
+  world: saas
+  expect: unsafe
+  sql: SELECT avg(o.amount) FROM orders o JOIN shipments s ON o.order_id = s.order_id
+
+- name: fan_with_where
+  world: saas
+  expect: unsafe
+  sql: >
+    SELECT sum(o.amount) FROM orders o
+    JOIN shipments s ON o.order_id = s.order_id WHERE o.status = 'completed'
+
+- name: fan_with_group_by                # grouping does not repair the measure
+  world: saas
+  expect: unsafe
+  sql: >
+    SELECT c.region, sum(o.amount) FROM customers c
+    JOIN orders o ON c.customer_id = o.customer_id
+    JOIN shipments s ON o.order_id = s.order_id GROUP BY c.region
+
+- name: chasm_sum                        # two 1:N legs from customers multiply
+  world: saas
+  expect: unsafe
+  paths: ["customers -> subscriptions"]
+  sql: >
+    SELECT sum(o.amount) FROM customers c
+    JOIN orders o ON c.customer_id = o.customer_id
+    JOIN subscriptions sub ON c.customer_id = sub.customer_id
+
+- name: chasm_count_star                 # result grain matches no declared table
+  world: saas
+  expect: unsafe
+  sql: >
+    SELECT count(*) FROM customers c
+    JOIN orders o ON c.customer_id = o.customer_id
+    JOIN subscriptions sub ON c.customer_id = sub.customer_id
+
+- name: dimension_measure_fan            # MRR repeated once per order
+  world: saas
+  expect: unsafe
+  paths: ["customers -> orders"]
+  sql: >
+    SELECT sum(sub.mrr) FROM subscriptions sub
+    JOIN customers c ON sub.customer_id = c.customer_id
+    JOIN orders o ON c.customer_id = o.customer_id
+
+- name: cte_passthrough_fan              # fan-out hidden inside a non-aggregating CTE
+  world: saas
+  expect: unsafe
+  sql: >
+    WITH t AS (SELECT o.amount AS amount FROM orders o
+               JOIN shipments s ON o.order_id = s.order_id)
+    SELECT sum(amount) FROM t
+
+- name: scalar_subquery_fan
+  world: saas
+  expect: unsafe
+  sql: >
+    SELECT (SELECT sum(o.amount) FROM orders o
+            JOIN shipments s ON o.order_id = s.order_id) AS revenue
+
+- name: quoted_fan
+  world: saas
+  expect: unsafe
+  sql: >
+    SELECT sum("o"."amount") FROM "orders" AS "o"
+    JOIN "shipments" AS "s" ON "o"."order_id" = "s"."order_id"
+
+- name: finance_canonical_fan
+  world: finance
+  expect: unsafe
+  paths: ["transactions -> ledger_entries"]
+  sql: >
+    SELECT sum(t.amount) FROM transactions t
+    JOIN ledger_entries l ON t.transaction_id = l.transaction_id
+
+- name: finance_chasm
+  world: finance
+  expect: unsafe
+  sql: >
+    SELECT sum(t.amount) FROM accounts a
+    JOIN transactions t ON a.account_id = t.account_id
+    JOIN ledger_entries l ON a.account_id = l.account_id
+
+# ------------------------------------------------------- COUNT repairs (needs_distinct)
+- name: count_order_ids_over_fan
+  world: saas
+  expect: needs_distinct
+  sql: SELECT count(o.order_id) FROM orders o JOIN shipments s ON o.order_id = s.order_id
+
+- name: finance_count_txn_over_fan
+  world: finance
+  expect: needs_distinct
+  sql: >
+    SELECT count(t.transaction_id) FROM transactions t
+    JOIN ledger_entries l ON t.transaction_id = l.transaction_id
+
+# ------------------------------------------------------------- out of fence (unknown)
+- name: window_function
+  world: saas
+  expect: unknown
+  sql: SELECT sum(amount) OVER () FROM orders
+
+- name: union_query
+  world: saas
+  expect: unknown
+  sql: SELECT sum(amount) FROM orders UNION ALL SELECT sum(mrr) FROM subscriptions
+
+- name: nested_two_levels
+  world: saas
+  expect: unknown
+  sql: >
+    SELECT sum(a) FROM (SELECT amount AS a FROM (SELECT amount FROM orders) AS x) AS y
+
+- name: self_join
+  world: saas
+  expect: unknown
+  sql: SELECT sum(a.amount) FROM orders a JOIN orders b ON a.order_id = b.order_id
+
+- name: undeclared_relationship
+  world: saas
+  expect: unknown
+  sql: SELECT sum(o.amount) FROM orders o JOIN events e ON o.customer_id = e.user_id
+
+- name: table_not_in_grain_model
+  world: saas
+  expect: unknown
+  sql: SELECT sum(o.amount) FROM orders o JOIN refunds r ON o.order_id = r.order_id
+
+- name: non_equi_join
+  world: saas
+  expect: unknown
+  sql: SELECT sum(o.amount) FROM orders o JOIN shipments s ON o.order_id > s.order_id
+
+- name: using_join
+  world: saas
+  expect: unknown
+  sql: SELECT sum(o.amount) FROM orders o JOIN shipments s USING (order_id)
+
+- name: right_join
+  world: saas
+  expect: unknown
+  sql: >
+    SELECT sum(o.amount) FROM orders o
+    RIGHT JOIN shipments s ON o.order_id = s.order_id
+
+- name: cross_join
+  world: saas
+  expect: unknown
+  sql: SELECT sum(o.amount) FROM orders o CROSS JOIN shipments s
+
+- name: sum_distinct_changes_semantics
+  world: saas
+  expect: unknown
+  sql: SELECT sum(DISTINCT o.amount) FROM orders o JOIN shipments s ON o.order_id = s.order_id
+
+- name: finance_cyclic_join_graph       # t-l, l-a, a-t closes a triangle
+  world: finance
+  expect: unknown
+  sql: >
+    SELECT sum(t.amount) FROM transactions t
+    JOIN ledger_entries l ON t.transaction_id = l.transaction_id
+    JOIN accounts a ON l.account_id = a.account_id AND a.account_id = t.account_id
