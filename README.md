@@ -30,10 +30,14 @@ answer was right" across five axes — and ships the chart that shows it.
 
 ## Status
 
-Pre-alpha. Phase 0 (foundation) is the current milestone. The project is built in eight
-gated phases: worlds, contracts + scorer, grain checker, runner, item bank, CLI + report,
-BYO mode, and launch. The directory tree is scaffolded with stub modules; application
-logic lands phase by phase.
+Pre-alpha. Phase 1 (worlds) is complete: two deterministic fake companies (`saas`,
+`finance`) build from seed, each planting a precondition for every trap class. The project
+is built in eight gated phases: worlds, contracts + scorer, grain checker, runner, item
+bank, CLI + report, BYO mode, and launch. Remaining application logic lands phase by phase.
+
+```bash
+ledgerbench world build --world all --seed 42   # build the bundled worlds locally
+```
 
 ## Quickstart
 

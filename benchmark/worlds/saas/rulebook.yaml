@@ -1,1 +1,133 @@
-# saas world rulebook: metric definitions, grains, calendars. Phase 1.
+# SaaS world rulebook -- the law from which gold is later derived mechanically.
+# Planted preconditions are called out inline so every trap class is grounded here.
+
+world: saas
+description: A small B2B SaaS company with orders, shipments, subscriptions, and product events.
+timezone: UTC
+reporting_timezone: America/New_York   # period/timezone precondition: events stored UTC, reported local
+fiscal_year_start_month: 1
+reference_date: 2026-06-01              # anchor for the active_7d / active_30d windows
+
+tables:
+  - name: customers
+    grain: [customer_id]
+    primary_key: [customer_id]
+    description: One row per customer account.
+  - name: subscriptions
+    grain: [subscription_id]
+    primary_key: [subscription_id]
+    description: One row per subscription.
+  - name: users
+    grain: [user_id]
+    primary_key: [user_id]
+    description: One row per end user; belongs to a customer.
+  - name: orders
+    grain: [order_id]
+    primary_key: [order_id]
+    description: One row per order; revenue is anchored here.
+  - name: shipments
+    grain: [shipment_id]
+    primary_key: [shipment_id]
+    description: One row per shipment; many shipments per order.
+  - name: events
+    grain: [event_id]
+    primary_key: [event_id]
+    description: One row per product event; UTC timestamp.
+
+relationships:
+  - name: orders_to_customers
+    from_table: orders
+    to_table: customers
+    from_columns: [customer_id]
+    to_columns: [customer_id]
+    cardinality: many_to_one
+  - name: subscriptions_to_customers
+    from_table: subscriptions
+    to_table: customers
+    from_columns: [customer_id]
+    to_columns: [customer_id]
+    cardinality: many_to_one
+  - name: users_to_customers
+    from_table: users
+    to_table: customers
+    from_columns: [customer_id]
+    to_columns: [customer_id]
+    cardinality: many_to_one
+  # GRAIN precondition: orders 1 -> many shipments. Summing orders.amount across this
+  # join inflates revenue (the canonical $100 order x 3 shipments = $300 fan trap).
+  - name: shipments_to_orders
+    from_table: shipments
+    to_table: orders
+    from_columns: [order_id]
+    to_columns: [order_id]
+    cardinality: many_to_one
+  - name: events_to_users
+    from_table: events
+    to_table: users
+    from_columns: [user_id]
+    to_columns: [user_id]
+    cardinality: many_to_one
+
+metrics:
+  # DEFINITIONAL precondition: revenue counts completed orders and excludes refunds.
+  - id: revenue
+    description: Revenue from completed orders, excluding refunded orders.
+    base_table: orders
+    measure: sum(amount)
+    value_type: numeric
+    grain: [order_id]
+    filters:
+      - "status = 'completed'"
+    exclusions:
+      - "refunded = true"
+  # CONTROL: a clean count that should just work (guards against winning by refusing).
+  - id: order_count
+    description: Total number of orders.
+    base_table: orders
+    measure: count(*)
+    value_type: count
+    grain: [order_id]
+  # AMBIGUITY pair: "active users" is underspecified -- 7-day vs 30-day window.
+  - id: active_users_7d
+    description: Distinct users with an event in the 7 days up to the reference date.
+    base_table: events
+    measure: count(distinct user_id)
+    value_type: count
+    grain: [event_id]
+    filters:
+      - "event_ts >= reference_date - INTERVAL 7 DAY"
+  - id: active_users_30d
+    description: Distinct users with an event in the 30 days up to the reference date.
+    base_table: events
+    measure: count(distinct user_id)
+    value_type: count
+    grain: [event_id]
+    filters:
+      - "event_ts >= reference_date - INTERVAL 30 DAY"
+  - id: active_mrr
+    description: Monthly recurring revenue from active subscriptions.
+    base_table: subscriptions
+    measure: sum(mrr)
+    value_type: numeric
+    grain: [subscription_id]
+    filters:
+      - "status = 'active'"
+
+ambiguities:
+  - term: active users
+    readings: [active_users_7d, active_users_30d]
+    note: '"Active users" does not specify a window; 7-day and 30-day are both defensible.'
+
+# REFUSAL precondition: a plausible dimension that simply is not in the data.
+absent_dimensions:
+  - name: acquisition_channel
+    note: No marketing/acquisition source is tracked, so "revenue by channel" is unanswerable.
+
+irregularities:
+  - table: customers
+    kind: nulls
+    column: region
+    note: About 3% of customers have a null region.
+  - table: events
+    kind: duplicates
+    note: A small block of logical duplicate events (same user, timestamp, and type).
