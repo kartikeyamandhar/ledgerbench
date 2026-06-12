@@ -9,6 +9,7 @@ Phase 6.
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 import typer
 from rich.console import Console
@@ -120,3 +121,351 @@ def validate(
         _console.print(f"[red]error[/red] {error}")
     _console.print(f"[red]{len(report.errors)} error(s).[/red]")
     raise typer.Exit(code=1)
+
+
+# --- Phase 6: demo / run / report ------------------------------------------------
+
+
+def _build_and_load(
+    suite_path: Path, seed: int, limit: int | None
+) -> tuple[
+    list[Any], dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any]
+]:
+    """Build worlds and load everything a scored run needs (CLI glue)."""
+    import duckdb
+
+    from ledgerbench.generator.suite import load_bank
+    from ledgerbench.ingestion.rulebook import load_rulebook
+
+    items = load_bank(suite_path)
+    if limit is not None:
+        items = items[:limit]
+    world_names = sorted({item.world for item in items})
+
+    db_paths: dict[str, Path] = {}
+    schema_ddls: dict[str, str] = {}
+    context_packs: dict[str, str] = {}
+    rulebooks = {}
+    for name in world_names:
+        _console.print(f"building world [bold]{name}[/bold] (seed {seed}) ...")
+        db_paths[name] = worlds.build_world(name, seed=seed)
+        schema_ddls[name] = (worlds.WORLDS_DIR / name / "schema.sql").read_text(encoding="utf-8")
+        context_packs[name] = (worlds.WORLDS_DIR / name / "rulebook.yaml").read_text(
+            encoding="utf-8"
+        )
+        rulebooks[name] = load_rulebook(worlds.WORLDS_DIR / name / "rulebook.yaml")
+
+    registries = {n: rb.to_registry() for n, rb in rulebooks.items()}
+    grain_models = {n: rb.to_grain_model() for n, rb in rulebooks.items()}
+    reference_dates = {n: rb.reference_date for n, rb in rulebooks.items()}
+    connections = {n: duckdb.connect(str(p), read_only=True) for n, p in db_paths.items()}
+    run_inputs = {
+        "db_paths": db_paths,
+        "schema_ddls": schema_ddls,
+        "context_packs": context_packs,
+        "world_hashes": {n: worlds.digest_database(p) for n, p in db_paths.items()},
+    }
+    return items, run_inputs, registries, grain_models, reference_dates, connections
+
+
+def _execute_and_score(
+    items: list[Any],
+    run_inputs: dict[str, Any],
+    registries: dict[str, Any],
+    grain_models: dict[str, Any],
+    reference_dates: dict[str, Any],
+    connections: dict[str, Any],
+    *,
+    adapter_name: str,
+    condition: str,
+    seeds: tuple[int, ...],
+    suite_path: Path,
+    out_dir: Path,
+    judge: Any | None,
+    budget_kwargs: dict[str, Any] | None = None,
+) -> tuple[Any, list[Any], list[Any]]:
+    """Run one condition end to end; returns (manifest, records, verdicts)."""
+    from ledgerbench.adapters.base import load_adapter
+    from ledgerbench.generator.suite import suite_hash
+    from ledgerbench.runner.budget import BudgetTracker
+    from ledgerbench.runner.executor import RunSpec, run_items
+    from ledgerbench.runner.trace import read_traces
+    from ledgerbench.scorer.pipeline import score_run
+
+    out_dir.mkdir(parents=True, exist_ok=True)
+    trace_path = out_dir / "traces.jsonl"
+    spec = RunSpec(
+        db_paths=run_inputs["db_paths"],
+        schema_ddls=run_inputs["schema_ddls"],
+        context_packs=run_inputs["context_packs"],
+        condition=condition,  # type: ignore[arg-type]
+        seeds=seeds,
+        trace_path=trace_path,
+        suite_version=items[0].version if items else "unknown",
+        suite_hash=suite_hash(suite_path),
+        world_hashes=run_inputs["world_hashes"],
+    )
+    adapter = load_adapter(adapter_name)
+    manifest = run_items(items, adapter, spec, BudgetTracker(**(budget_kwargs or {})))
+    (out_dir / "manifest.json").write_text(manifest.model_dump_json(indent=2), encoding="utf-8")
+
+    records = list(read_traces(trace_path))
+    verdicts = score_run(
+        items,
+        records,
+        registries=registries,
+        grain_models=grain_models,
+        connections=connections,
+        reference_dates=reference_dates,
+        judge=judge,
+    )
+    return manifest, records, verdicts
+
+
+@app.command("demo")
+def demo(
+    limit: int | None = typer.Option(
+        None, "--limit", help="Run only the first N items (default: the full bank)."
+    ),
+    seed: int = typer.Option(42, "--seed", help="World build seed."),
+    open_report: bool = typer.Option(
+        True, "--open/--no-open", help="Open the rendered report in a browser."
+    ),
+) -> None:
+    """The five-minute experience: build worlds, run the offline baseline, render.
+
+    Needs no API keys and touches no network. The naive baseline answers every
+    question -- including the ones it should clarify or refuse -- which is
+    exactly the gap the report visualizes.
+    """
+    from ledgerbench.report.html import render_report
+
+    suite_path = Path("benchmark/items/public_v1.jsonl")
+    if not suite_path.is_file():
+        _console.print(
+            "[red]item bank not found.[/red] Run from a checkout of the repository "
+            f"(missing {suite_path})."
+        )
+        raise typer.Exit(code=2)
+
+    items, run_inputs, registries, grain_models, reference_dates, connections = _build_and_load(
+        suite_path, seed, limit
+    )
+    out_dir = Path(".ledgerbench/demo")
+    try:
+        _console.print(f"running [bold]naive[/bold] adapter on {len(items)} items (open book) ...")
+        manifest, records, verdicts = _execute_and_score(
+            items,
+            run_inputs,
+            registries,
+            grain_models,
+            reference_dates,
+            connections,
+            adapter_name="naive",
+            condition="open",
+            seeds=(seed,),
+            suite_path=suite_path,
+            out_dir=out_dir,
+            judge=None,
+        )
+        from ledgerbench.config import DEFAULT_THRESHOLDS, DEFAULT_WEIGHTS
+
+        result = render_report(
+            items,
+            records,
+            verdicts,
+            manifest,
+            registries=registries,
+            reference_dates=reference_dates,
+            weights=DEFAULT_WEIGHTS,
+            thresholds=DEFAULT_THRESHOLDS,
+            judge_configured=False,
+            out_path=out_dir / "report.html",
+        )
+    finally:
+        for con in connections.values():
+            con.close()
+
+    _console.print(
+        f"\n[green]demo complete[/green]: ran fine "
+        f"{result.extra['ran_fine'] * 100:.0f}% vs business-correct "
+        f"{result.extra['business_correct'] * 100:.0f}% "
+        f"(weighted overall {result.overall * 100:.1f}%)"
+    )
+    _console.print(f"report: {result.path}  ({result.size_bytes / 1024:.0f} KiB)")
+    if result.breaches:
+        _console.print(
+            f"[yellow]threshold breaches (informational in demo): "
+            f"{', '.join(result.breaches)}[/yellow]"
+        )
+    if open_report:
+        typer.launch(str(result.path.resolve()))
+
+
+@app.command("run")
+def run(
+    config_path: Path = typer.Option(  # noqa: B008 - typer evaluates defaults at import
+        Path("ledgerbench.yaml"), "--config", "-c", help="Path to ledgerbench.yaml."
+    ),
+    use_judge: bool = typer.Option(
+        False,
+        "--judge/--no-judge",
+        help="Enable the live faithfulness judge (requires ANTHROPIC_API_KEY; costs money).",
+    ),
+    limit: int | None = typer.Option(None, "--limit", help="Run only the first N items."),
+) -> None:
+    """Config-driven benchmark run; exit code 1 on any axis-threshold breach.
+
+    Runs every condition in the config, renders one report per condition, and
+    adds the closed-vs-open comparison when both are present.
+    """
+    from ledgerbench.config import load_config
+    from ledgerbench.errors import LedgerBenchError
+    from ledgerbench.report.html import render_report
+    from ledgerbench.scorer.aggregate import aggregate
+
+    try:
+        config = load_config(config_path)
+    except LedgerBenchError as exc:
+        _console.print(f"[red]{exc}[/red]")
+        _console.print("Copy ledgerbench.example.yaml to ledgerbench.yaml and edit it.")
+        raise typer.Exit(code=2) from exc
+
+    judge = None
+    if use_judge:
+        from ledgerbench.scorer.faithfulness import AnthropicJudge, CachingJudge
+
+        judge = CachingJudge(AnthropicJudge(), cache_dir=Path(".ledgerbench/judge_cache"))
+
+    items, run_inputs, registries, grain_models, reference_dates, connections = _build_and_load(
+        config.suite, config.worlds.build_seed, limit
+    )
+
+    breached: list[str] = []
+    axis_rates: dict[str, dict[str, float]] = {}
+    try:
+        for condition in config.conditions:
+            out_dir = Path(".ledgerbench/runs") / f"{config.agent.adapter}-{condition}"
+            _console.print(
+                f"\nrunning [bold]{config.agent.adapter}[/bold] "
+                f"({condition} book, {len(items)} items, seeds {list(config.repetitions.seeds)})"
+            )
+            manifest, records, verdicts = _execute_and_score(
+                items,
+                run_inputs,
+                registries,
+                grain_models,
+                reference_dates,
+                connections,
+                adapter_name=config.agent.adapter,
+                condition=condition,
+                seeds=config.repetitions.seeds,
+                suite_path=config.suite,
+                out_dir=out_dir,
+                judge=judge,
+                budget_kwargs={
+                    "max_calls_per_item": config.budget.max_calls_per_item,
+                    "max_usd_per_run": config.budget.max_usd_per_run,
+                },
+            )
+            effective_weights = dict(config.weights)
+            if judge is None:
+                effective_weights.pop("faithfulness", None)
+            axis_rates[condition] = {
+                axis: s.rate for axis, s in aggregate(verdicts, effective_weights).per_axis.items()
+            }
+            comparison = None
+            if condition == "open" and "closed" in axis_rates:
+                comparison = (axis_rates["closed"], axis_rates["open"])
+            result = render_report(
+                items,
+                records,
+                verdicts,
+                manifest,
+                registries=registries,
+                reference_dates=reference_dates,
+                weights=config.weights,
+                thresholds=config.thresholds,
+                judge_configured=judge is not None,
+                out_path=out_dir / "report.html",
+                comparison=comparison,
+            )
+            _console.print(
+                f"[green]{condition} done[/green]: overall {result.overall * 100:.1f}% "
+                f"-> {result.path}"
+            )
+            breached.extend(f"{condition}:{axis}" for axis in result.breaches)
+    finally:
+        for con in connections.values():
+            con.close()
+
+    if breached:
+        _console.print(f"[red]threshold breaches:[/red] {', '.join(breached)}")
+        raise typer.Exit(code=1)
+    _console.print("[green]all axis thresholds met.[/green]")
+
+
+@app.command("report")
+def report(
+    traces: Path = typer.Option(..., "--traces", help="Trace JSONL from a previous run."),  # noqa: B008
+    manifest_path: Path = typer.Option(  # noqa: B008 - typer evaluates defaults at import
+        ..., "--manifest", help="manifest.json from that run."
+    ),
+    suite: Path = typer.Option(  # noqa: B008 - typer evaluates defaults at import
+        Path("benchmark/items/public_v1.jsonl"), "--suite", help="The suite that was run."
+    ),
+    out: Path = typer.Option(  # noqa: B008 - typer evaluates defaults at import
+        Path(".ledgerbench/report.html"), "--out", help="Where to write the report."
+    ),
+    seed: int = typer.Option(42, "--seed", help="World build seed (must match the run)."),
+) -> None:
+    """Re-render (and re-score) a report from existing traces. No model calls.
+
+    This is the auditability path: tweak tolerances or weights in code/config,
+    re-run this command, and the old run is re-judged without touching an API.
+    """
+    from ledgerbench.config import DEFAULT_THRESHOLDS, DEFAULT_WEIGHTS
+    from ledgerbench.contracts.manifest import RunManifest
+    from ledgerbench.report.html import render_report
+    from ledgerbench.runner.trace import read_traces
+    from ledgerbench.scorer.pipeline import score_run
+
+    for path, label in ((traces, "traces"), (manifest_path, "manifest"), (suite, "suite")):
+        if not path.is_file():
+            _console.print(f"[red]{label} file not found:[/red] {path}")
+            raise typer.Exit(code=2)
+
+    manifest = RunManifest.model_validate_json(manifest_path.read_text(encoding="utf-8"))
+    records = list(read_traces(traces))
+    item_ids = {r.item_id for r in records}
+
+    items, _run_inputs, registries, grain_models, reference_dates, connections = _build_and_load(
+        suite, seed, None
+    )
+    items = [i for i in items if i.id in item_ids]
+    try:
+        verdicts = score_run(
+            items,
+            records,
+            registries=registries,
+            grain_models=grain_models,
+            connections=connections,
+            reference_dates=reference_dates,
+            judge=None,
+        )
+        result = render_report(
+            items,
+            records,
+            verdicts,
+            manifest,
+            registries=registries,
+            reference_dates=reference_dates,
+            weights=DEFAULT_WEIGHTS,
+            thresholds=DEFAULT_THRESHOLDS,
+            judge_configured=False,
+            out_path=out,
+        )
+    finally:
+        for con in connections.values():
+            con.close()
+    _console.print(f"[green]re-rendered[/green] {result.path} ({result.size_bytes / 1024:.0f} KiB)")

@@ -30,12 +30,11 @@ answer was right" across five axes — and ships the chart that shows it.
 
 ## Status
 
-Pre-alpha. Phases 1–2 are complete: two deterministic fake companies (`saas`, `finance`)
-build from seed with every trap-class precondition planted, and the data contracts are
-frozen with a deterministic, golden-tested scorer core (definitional, ambiguity, refusal
-axes; 100% branch coverage enforced in CI). The project is built in eight gated phases:
-worlds, contracts + scorer, grain checker, runner, item bank, CLI + report, BYO mode, and
-launch. Remaining application logic lands phase by phase.
+Phases 0–6 are complete: deterministic worlds, frozen contracts, the golden-tested
+scorer (all five axes), the fail-closed static grain checker (TPR 1.000 / FPR 0.000 on its
+published corpus), the SELECT-only sandboxed runner with kill-tests, the 150-item public
+bank with recipe-derived gold, and the end-to-end CLI + single-file report. Remaining:
+BYO/dbt mode (Phase 7) and launch packaging (Phase 8).
 
 ```bash
 ledgerbench world build --world all --seed 42   # build the bundled worlds locally
@@ -43,12 +42,23 @@ ledgerbench world build --world all --seed 42   # build the bundled worlds local
 
 ## Quickstart
 
-> _Finalized in Phase 6. The five-minute demo will be:_
+From a checkout (PyPI packaging lands in Phase 8):
 
 ```bash
-pip install ledgerbench
-ledgerbench demo          # builds the fake company, runs a baseline agent, opens a report
+git clone https://github.com/kartikeyamandhar/ledgerbench && cd ledgerbench
+python3.11 -m venv agentic_flow && source agentic_flow/bin/activate
+pip install -e .
+ledgerbench demo          # ~35s: builds both worlds, runs the offline baseline, opens the report
 ```
+
+No API keys, no network. The demo runs the deterministic naive baseline over all 150
+items and renders the headline finding: on our machine, **100% of its queries ran fine
+and 9% of its answers were business-correct**. That gap is the benchmark's point.
+
+Other commands: `ledgerbench run -c ledgerbench.yaml` (config-driven, exit code 1 on
+axis-threshold breach — the CI gate), `ledgerbench report` (re-render/re-score from
+traces, no model calls), `ledgerbench validate` (lint the item bank, recompute gold),
+`ledgerbench world build`.
 
 ### Develop
 

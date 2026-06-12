@@ -1,1 +1,102 @@
-{# LedgerBench report template. Populated in Phase 6. #}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>LedgerBench report — {{ manifest.agent_id }} ({{ manifest.condition }})</title>
+<style>
+  body { font-family: -apple-system, "Segoe UI", Roboto, sans-serif; margin: 2rem auto;
+         max-width: 860px; color: #212121; line-height: 1.45; }
+  h1 { font-size: 1.5rem; } h2 { font-size: 1.15rem; margin-top: 2rem; }
+  table { border-collapse: collapse; width: 100%; margin: 0.5rem 0 1rem; }
+  th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid #e0e0e0;
+           font-size: 0.9rem; }
+  th { background: #fafafa; }
+  code, pre { background: #f5f5f5; border-radius: 4px; font-size: 0.82rem; }
+  pre { padding: 10px; overflow-x: auto; }
+  details { border: 1px solid #e0e0e0; border-radius: 6px; margin: 0.5rem 0;
+            padding: 0.4rem 0.8rem; }
+  summary { cursor: pointer; font-weight: 600; font-size: 0.9rem; }
+  .fail { color: #c62828; } .pass { color: #2e7d32; } .unknown { color: #ef6c00; }
+  .na { color: #9e9e9e; }
+  .footer { margin-top: 3rem; padding-top: 1rem; border-top: 1px solid #e0e0e0;
+            font-size: 0.78rem; color: #616161; }
+  .badge { display: inline-block; padding: 1px 8px; border-radius: 10px;
+           font-size: 0.78rem; background: #eeeeee; margin-right: 6px; }
+</style>
+</head>
+<body>
+<h1>LedgerBench — business correctness report</h1>
+<p>
+  <span class="badge">agent: {{ manifest.agent_id }}</span>
+  <span class="badge">condition: {{ manifest.condition }}</span>
+  <span class="badge">items: {{ manifest.totals.items }}</span>
+  <span class="badge">suite: {{ manifest.suite_version }} ({{ manifest.suite_hash }})</span>
+  {% if manifest.model_snapshot_id %}<span class="badge">model: {{ manifest.model_snapshot_id }}</span>{% endif %}
+</p>
+
+{{ gap_svg | safe }}
+
+<h2>Per-axis results</h2>
+{{ axis_svg | safe }}
+<table>
+  <tr><th>axis</th><th>pass</th><th>fail</th><th>unknown</th><th>n/a</th>
+      <th>pass rate</th><th>weight</th><th>threshold</th><th>gate</th></tr>
+  {% for axis, row in axis_rows.items() %}
+  <tr>
+    <td>{{ axis }}</td><td>{{ row.passed }}</td><td>{{ row.failed }}</td>
+    <td>{{ row.unknown }}</td><td>{{ row.na }}</td>
+    <td>{{ "%.1f" | format(row.rate * 100) }}%</td>
+    <td>{{ "%.2f" | format(row.weight) }}</td>
+    <td>{{ "%.0f" | format(row.threshold * 100) }}%</td>
+    <td class="{{ 'pass' if row.met else 'fail' }}">{{ 'met' if row.met else 'BREACH' }}</td>
+  </tr>
+  {% endfor %}
+</table>
+<p><strong>Overall (weighted): {{ "%.1f" | format(overall * 100) }}%</strong>
+   — weights are printed above; <em>unknown counts against the agent</em>
+   (fail-closed), and n/a axes renormalize.</p>
+{% if no_judge_note %}
+<p class="unknown">Faithfulness was <strong>not evaluated</strong> in this run
+   (no judge configured — offline mode). Its unknowns are tool-side, not agent
+   failures, and it is excluded from the CI gate for this run.</p>
+{% endif %}
+
+{% if condition_svg %}
+<h2>Closed book vs open book</h2>
+{{ condition_svg | safe }}
+{% endif %}
+
+<h2>Failure gallery ({{ failures | length }})</h2>
+{% for f in failures %}
+<details>
+  <summary><span class="fail">✗</span> {{ f.item_id }} — {{ f.trap_class }} — {{ f.reason }}</summary>
+  <p><strong>Question:</strong> {{ f.question }}</p>
+  {% if f.agent_sql %}<p><strong>Agent SQL:</strong></p><pre>{{ f.agent_sql }}</pre>{% endif %}
+  {% if f.gold_sql %}<p><strong>Gold SQL (from the rulebook):</strong></p><pre>{{ f.gold_sql }}</pre>{% endif %}
+  <p><strong>Evidence:</strong></p>
+  <table>
+    {% for axis, line in f.evidence.items() %}
+    <tr><td>{{ axis }}</td><td class="{{ f.statuses[axis] }}">{{ f.statuses[axis] }}</td>
+        <td>{{ line }}</td></tr>
+    {% endfor %}
+  </table>
+</details>
+{% else %}
+<p class="pass">No failures. Either the agent is excellent or the suite is too easy — check the controls.</p>
+{% endfor %}
+
+<div class="footer">
+  <p><strong>Run manifest.</strong>
+     tool v{{ manifest.tool_version }} · git {{ manifest.git_commit[:12] }} ·
+     condition {{ manifest.condition }} · seeds {{ manifest.seeds | join(", ") }} ·
+     cost ${{ "%.4f" | format(manifest.totals.cost_usd) }} ·
+     latency p50 {{ "%.0f" | format(manifest.totals.latency_p50_ms) }} ms /
+     p95 {{ "%.0f" | format(manifest.totals.latency_p95_ms) }} ms ·
+     created {{ manifest.created_at }}</p>
+  <p>World digests:
+     {% for world, digest in manifest.world_hashes.items() %}{{ world }}={{ digest[:12] }} {% endfor %}</p>
+  <p>Every number above is recomputable from the trace file and this manifest.
+     Gold derives mechanically from the world rulebooks; no model is involved in gold.</p>
+</div>
+</body>
+</html>
