@@ -6,6 +6,33 @@ Semantic Versioning. `v1.0.0` is reserved for the public launch (Phase 8).
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-06-12
+
+### Added
+
+- **Keyed benchmark results** (committed, append-only): claude-haiku-4-5 and
+  gpt-4o-mini × {closed, open} over the public 150 ($1.62 total model spend, per-run
+  hard caps). The A/B finding lands: the rulebook lifts gpt-4o-mini from 42.0% to 59.3%
+  business-correct (haiku 38.0%→44.0%, single seed) with ran-fine at 100% throughout —
+  and a ~40% open-book residual survives. Full analysis in `docs/report.md`, including
+  the per-axis side effects (the rulebook *degrades* grain/refusal/faithfulness for
+  mini) and haiku's open-book `value: null` malformed cluster (the contract binds).
+- **Live judge calibration: 0.90 agreement** (gate ≥ 0.8) on the 20-case set; RT-014
+  closed. Faithfulness scored live (double-run, cached) on all keyed rows.
+- Roster runner flags: `--seeds`, `--max-usd`; per-model result directories and
+  `adapter:model` roster specs.
+
+### Fixed
+
+- Adapters now extract the contract payload from real model transport: markdown fences
+  and prose-wrapped JSON are unwrapped at the adapter layer; probe-budget exhaustion
+  gets a final answer turn; probe engine errors (hallucinated columns) return to the
+  model as feedback instead of crashing the host. Each fix carries a regression test
+  and was found by live smoke runs before the campaign.
+- Adapter system prompt no longer describes `value` as nullable for answers (it invited
+  the haiku cluster above); reruns under the tightened prompt are future work.
+
+
 ## [1.0.0] - 2026-06-12
 
 ### Added
@@ -213,7 +240,8 @@ Semantic Versioning. `v1.0.0` is reserved for the public launch (Phase 8).
   `.claude/settings.json` (`includeCoAuthoredBy: false`).
 - Placeholder test: package imports and `__version__` matches installed metadata.
 
-[Unreleased]: https://github.com/kartikeyamandhar/ledgerbench/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/kartikeyamandhar/ledgerbench/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/kartikeyamandhar/ledgerbench/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/kartikeyamandhar/ledgerbench/compare/v0.7.0...v1.0.0
 [0.7.0]: https://github.com/kartikeyamandhar/ledgerbench/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/kartikeyamandhar/ledgerbench/compare/v0.5.0...v0.6.0

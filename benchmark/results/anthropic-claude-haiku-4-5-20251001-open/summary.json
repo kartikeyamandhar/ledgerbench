@@ -1,0 +1,18 @@
+{
+  "agent": "anthropic:claude-haiku-4-5-20251001",
+  "business_correct": 0.44,
+  "condition": "open",
+  "cost_usd": 0.702453,
+  "items": 150,
+  "judge": "claude-haiku double-run, cached (calibration agreement 0.90)",
+  "overall_weighted": 0.2907538947493891,
+  "per_axis": {
+    "ambiguity": 0.2553191489361702,
+    "definitional": 0.23809523809523808,
+    "faithfulness": 0.28431372549019607,
+    "grain": 0.30392156862745096,
+    "refusal": 0.416
+  },
+  "ran_fine": 1.0,
+  "suite_hash": "da57177f1e72fb34"
+}

@@ -1,0 +1,26 @@
+{
+  "tool_version": "1.0.0",
+  "suite_version": "public_v1",
+  "suite_hash": "da57177f1e72fb34",
+  "world_hashes": {
+    "finance": "a8684b7607905129975e320484f8953b8edba0de5d38e0c71b036245e0fafb1c",
+    "saas": "1472121643ddd93c550cc85a729bd6eb26c5a3e74d564fb5a0ed8e44fbf8e5c4"
+  },
+  "agent_id": "http_openai",
+  "model_snapshot_id": "gpt-4o-mini",
+  "condition": "closed",
+  "seeds": [
+    11,
+    22,
+    33
+  ],
+  "repetitions": 3,
+  "totals": {
+    "items": 450,
+    "cost_usd": 0.11177,
+    "latency_p50_ms": 2250.546,
+    "latency_p95_ms": 4548.094
+  },
+  "git_commit": "232f0bd121a800f5a99400611ca0430f6f03fc8c",
+  "created_at": "2026-06-12T20:33:59.556089Z"
+}
