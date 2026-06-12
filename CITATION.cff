@@ -13,8 +13,8 @@ abstract: >-
 repository-code: "https://github.com/kartikeyamandhar/ledgerbench"
 url: "https://github.com/kartikeyamandhar/ledgerbench"
 license: Apache-2.0
-version: 0.0.1
-date-released: "2026-06-10"
+version: 1.0.0
+date-released: "2026-06-12"
 keywords:
   - benchmark
   - analytics

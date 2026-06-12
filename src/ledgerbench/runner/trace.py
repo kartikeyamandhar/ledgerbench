@@ -85,8 +85,21 @@ class TraceWriter:
 
 
 def read_traces(path: str | Path) -> Iterator[TraceRecord]:
-    """Stream trace records back from a JSONL file."""
-    with Path(path).open(encoding="utf-8") as handle:
+    """Stream trace records back from a JSONL file (``.gz`` transparently).
+
+    Committed benchmark results are gzipped (the open-book context pack rides
+    in every request and compresses ~50x); local runs stay plain JSONL.
+    """
+    trace_path = Path(path)
+    if trace_path.suffix == ".gz":
+        import gzip
+
+        with gzip.open(trace_path, "rt", encoding="utf-8") as handle:
+            for line in handle:
+                if line.strip():
+                    yield TraceRecord.model_validate_json(line)
+        return
+    with trace_path.open(encoding="utf-8") as handle:
         for line in handle:
             if line.strip():
                 yield TraceRecord.model_validate_json(line)

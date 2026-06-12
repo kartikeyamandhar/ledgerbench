@@ -1,0 +1,18 @@
+{
+  "agent": "naive",
+  "business_correct": 0.09333333333333334,
+  "condition": "closed",
+  "cost_usd": 0.0,
+  "items": 450,
+  "judge": "not evaluated (offline)",
+  "overall_weighted": 0.4894117647058823,
+  "per_axis": {
+    "ambiguity": 0.0,
+    "definitional": 0.13333333333333333,
+    "faithfulness": 0.0,
+    "grain": 1.0,
+    "refusal": 0.84
+  },
+  "ran_fine": 1.0,
+  "suite_hash": "da57177f1e72fb34"
+}

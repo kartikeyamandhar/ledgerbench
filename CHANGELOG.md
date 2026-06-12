@@ -6,6 +6,32 @@ Semantic Versioning. `v1.0.0` is reserved for the public launch (Phase 8).
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-06-12
+
+### Added
+
+- Phase 8 (Launch): `release.yml` — tag → build (`twine check`-ed) → PyPI via OIDC
+  trusted publishing (no stored token; activates on the one-time publisher
+  registration) → Docker image to GHCR with an offline-demo container smoke test.
+- `Dockerfile` (python:3.12-slim, non-root, demo as default command); wheel installs
+  now work outside a checkout (`WORLDS_DIR` falls back to the working directory).
+- Committed benchmark results, floor tier: naive × {closed, open} × 3 seeds over the
+  public 150 — ran-fine 100%, business-correct 9.3%, identical across conditions (the
+  floor ignores the rulebook; that is the demonstration). Traces gzipped (~50×;
+  `read_traces` handles `.gz` transparently) + manifests + summaries, append-only.
+- `scripts/run_benchmark.py` (roster runner: agents × conditions × seeds, resumable,
+  $150 hard cap) and `scripts/build_leaderboard.py` (static no-JS page as a pure
+  function of committed results).
+- Leaderboard deployed via `pages.yml` to GitHub Pages (enabled):
+  https://kartikeyamandhar.github.io/ledgerbench/ — per-axis columns beside the
+  aggregate, provenance column with suite hash/seeds/cost, frontier rows marked pending.
+- `docs/report.md`: the technical report (motivation, taxonomy, method, floor results,
+  failure gallery from real traces, limitations, future work) — `[pending keyed runs]`
+  markers where only real numbers may go.
+- `docs/launch-punch-list.md`: the owner-gated steps with exact commands.
+- README finding section; CITATION.cff at 1.0.0.
+
+
 ## [0.7.0] - 2026-06-12
 
 ### Added
@@ -187,7 +213,8 @@ Semantic Versioning. `v1.0.0` is reserved for the public launch (Phase 8).
   `.claude/settings.json` (`includeCoAuthoredBy: false`).
 - Placeholder test: package imports and `__version__` matches installed metadata.
 
-[Unreleased]: https://github.com/kartikeyamandhar/ledgerbench/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/kartikeyamandhar/ledgerbench/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/kartikeyamandhar/ledgerbench/compare/v0.7.0...v1.0.0
 [0.7.0]: https://github.com/kartikeyamandhar/ledgerbench/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/kartikeyamandhar/ledgerbench/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/kartikeyamandhar/ledgerbench/compare/v0.4.0...v0.5.0
