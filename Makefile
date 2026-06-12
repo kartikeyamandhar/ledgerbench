@@ -5,7 +5,7 @@ VENV := agentic_flow
 PY   := $(VENV)/bin/python
 PIP  := $(PY) -m pip
 
-.PHONY: help venv install fmt fmt-check lint type test cov check demo smoke build clean
+.PHONY: help venv install fmt fmt-check lint type test cov cov-core schemas check demo smoke build clean
 
 help: ## Show this help.
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
@@ -36,7 +36,16 @@ test: ## Run tests (no coverage gate).
 cov: ## Run tests with coverage and enforce gates.
 	$(PY) -m pytest --cov=ledgerbench --cov-branch --cov-report=term-missing
 
-check: fmt-check lint type cov ## Format check + lint + type + tests with coverage. The merge gate.
+cov-core: ## 100% branch gate on scorer core (reconcile, actions, aggregate).
+	$(PY) -m pytest tests/unit tests/golden/scorer -q \
+	  --cov=ledgerbench.scorer.reconcile --cov=ledgerbench.scorer.actions \
+	  --cov=ledgerbench.scorer.aggregate --cov-branch --cov-fail-under=100 \
+	  --cov-report=term-missing
+
+schemas: ## Re-export contract JSON Schemas to docs/contracts/.
+	$(PY) scripts/export_schemas.py
+
+check: fmt-check lint type cov cov-core ## Format check + lint + type + tests + coverage gates. The merge gate.
 
 demo: ## Full offline demo run (implemented in Phase 6).
 	@echo "ledgerbench demo lands in Phase 6."

@@ -35,3 +35,6 @@ htmlcov/
 
 # Operating manual for the AI agent; kept local by owner decision.
 CLAUDE.md
+
+# Personal Claude Code permission overrides (machine-local, never committed).
+.claude/settings.local.json

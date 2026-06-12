@@ -1,0 +1,58 @@
+# Hand-verified parse fixtures: which payloads are malformed (score zero) and
+# which leniencies are accepted (extra fields ignored; numeric strings coerce).
+# String payloads are parsed as raw JSON text; mappings as decoded objects.
+- name: not_json_text
+  payload: "this is not json{"
+  malformed: true
+
+- name: json_array_not_object
+  payload: "[1, 2, 3]"
+  malformed: true
+
+- name: json_scalar_not_object
+  payload: "42"
+  malformed: true
+
+- name: missing_action
+  payload: {value: 1.0, sql: "SELECT 1"}
+  malformed: true
+
+- name: unknown_action
+  payload: {action: punt, value: 1.0, sql: "SELECT 1"}
+  malformed: true
+
+- name: answer_without_value
+  payload: {action: answer, sql: "SELECT 1"}
+  malformed: true
+
+- name: answer_without_sql
+  payload: {action: answer, value: 2.0}
+  malformed: true
+
+- name: clarify_without_question
+  payload: {action: clarify}
+  malformed: true
+
+- name: refuse_without_reason
+  payload: {action: refuse}
+  malformed: true
+
+- name: confidence_out_of_range
+  payload: {action: answer, value: 1.0, sql: "SELECT 1", confidence: 1.5}
+  malformed: true
+
+- name: value_not_a_number
+  payload: {action: answer, value: lots, sql: "SELECT 1"}
+  malformed: true
+
+- name: extra_fields_are_ignored
+  payload: {action: answer, value: 1.0, sql: "SELECT 1", banana: true}
+  malformed: false
+
+- name: numeric_string_value_coerces
+  payload: {action: answer, value: "48200.5", sql: "SELECT 1"}
+  malformed: false
+
+- name: valid_json_string_payload
+  payload: '{"action": "refuse", "refusal_reason": "no cost center dimension"}'
+  malformed: false

@@ -1,0 +1,35 @@
+# Hand-verified aggregate fixtures. Verdict axes are given as {axis: status};
+# the test computes each verdict's roll-up. Overalls worked out by hand.
+- name: half_pass_single_axis            # 1 pass / 2 applicable = 0.5
+  verdicts:
+    - {definitional: pass}
+    - {definitional: fail}
+  weights: {definitional: 1.0}
+  expect_overall: 0.5
+
+- name: na_axis_renormalizes             # ambiguity never applies -> overall = definitional rate
+  verdicts:
+    - {definitional: pass, ambiguity: na}
+    - {definitional: pass, ambiguity: na}
+  weights: {definitional: 0.5, ambiguity: 0.5}
+  expect_overall: 1.0
+
+- name: unknown_counts_against           # fail-closed: unknown is not a free pass
+  verdicts:
+    - {definitional: unknown}
+    - {definitional: pass}
+  weights: {definitional: 1.0}
+  expect_overall: 0.5
+
+- name: weighted_mix                     # (0.3*1.0 + 0.15*0.0) / 0.45 = 2/3
+  verdicts:
+    - {definitional: pass, refusal: fail}
+  weights: {definitional: 0.3, refusal: 0.15}
+  expect_overall: 0.6666666666666666
+
+- name: all_five_axes_spec_weights       # rates: def 1.0, grain 0.0, amb 1.0, ref 0.5, faith 1.0(1 pass, 1 na)
+  verdicts:                              # overall = (0.30*1 + 0.25*0 + 0.15*1 + 0.15*0.5 + 0.15*1) / 1.0 = 0.675
+    - {definitional: pass, grain: fail, ambiguity: pass, refusal: pass, faithfulness: pass}
+    - {definitional: pass, grain: fail, ambiguity: pass, refusal: fail, faithfulness: na}
+  weights: {definitional: 0.30, grain: 0.25, ambiguity: 0.15, refusal: 0.15, faithfulness: 0.15}
+  expect_overall: 0.675

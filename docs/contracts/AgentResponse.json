@@ -1,0 +1,89 @@
+{
+  "description": "What an adapter returns; untrusted until validated.\n\nAction-specific requirements: ``answer`` needs ``value`` and ``sql``;\n``clarify`` needs ``clarifying_question``; ``refuse`` needs\n``refusal_reason``. A response that violates them is malformed.",
+  "properties": {
+    "action": {
+      "enum": [
+        "answer",
+        "clarify",
+        "refuse"
+      ],
+      "title": "Action",
+      "type": "string"
+    },
+    "assumptions": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "title": "Assumptions",
+      "type": "array"
+    },
+    "clarifying_question": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Clarifying Question"
+    },
+    "confidence": {
+      "anyOf": [
+        {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Confidence"
+    },
+    "refusal_reason": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Refusal Reason"
+    },
+    "sql": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Sql"
+    },
+    "value": {
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Value"
+    }
+  },
+  "required": [
+    "action"
+  ],
+  "title": "AgentResponse",
+  "type": "object"
+}

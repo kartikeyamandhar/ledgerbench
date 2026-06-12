@@ -30,10 +30,12 @@ answer was right" across five axes — and ships the chart that shows it.
 
 ## Status
 
-Pre-alpha. Phase 1 (worlds) is complete: two deterministic fake companies (`saas`,
-`finance`) build from seed, each planting a precondition for every trap class. The project
-is built in eight gated phases: worlds, contracts + scorer, grain checker, runner, item
-bank, CLI + report, BYO mode, and launch. Remaining application logic lands phase by phase.
+Pre-alpha. Phases 1–2 are complete: two deterministic fake companies (`saas`, `finance`)
+build from seed with every trap-class precondition planted, and the data contracts are
+frozen with a deterministic, golden-tested scorer core (definitional, ambiguity, refusal
+axes; 100% branch coverage enforced in CI). The project is built in eight gated phases:
+worlds, contracts + scorer, grain checker, runner, item bank, CLI + report, BYO mode, and
+launch. Remaining application logic lands phase by phase.
 
 ```bash
 ledgerbench world build --world all --seed 42   # build the bundled worlds locally

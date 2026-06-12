@@ -1,0 +1,94 @@
+# Hand-verified action-matrix fixtures (axes 3-4). Every cell of expected
+# {answer, clarify, refuse} x actual {answer, clarify, refuse, malformed} is here,
+# plus the term/dimension-matching requirements from ADR-0003.
+# `response: malformed` is a sentinel the test replaces with a MalformedResponse.
+
+# --- expected: answer (includes control items) ---
+- name: answer_answer_pass
+  expected: answer
+  response: {action: answer, value: 1.0, sql: "SELECT 1"}
+  expect: pass
+
+- name: answer_clarify_fails
+  expected: answer
+  response: {action: clarify, clarifying_question: "Which period do you mean?"}
+  expect: fail
+
+- name: answer_refuse_is_over_refusal
+  expected: answer
+  response: {action: refuse, refusal_reason: "I cannot determine this."}
+  expect: fail
+  over_refusal: true
+
+- name: answer_malformed_fails
+  expected: answer
+  response: malformed
+  expect: fail
+
+# --- expected: clarify (ambiguity items) ---
+- name: clarify_names_term_pass
+  expected: clarify
+  ambiguous_term: active users
+  response: {action: clarify, clarifying_question: "Do you mean active users over 7 days or 30 days?"}
+  expect: pass
+
+- name: clarify_generic_question_fails
+  expected: clarify
+  ambiguous_term: active users
+  response: {action: clarify, clarifying_question: "Could you give me more detail?"}
+  expect: fail
+
+- name: clarify_term_with_underscores_pass    # active_users normalizes to "active users"
+  expected: clarify
+  ambiguous_term: active users
+  response: {action: clarify, clarifying_question: "Is active_users the 7d or 30d definition?"}
+  expect: pass
+
+- name: clarify_answer_fails
+  expected: clarify
+  ambiguous_term: active users
+  response: {action: answer, value: 1234.0, sql: "SELECT count(*) FROM events"}
+  expect: fail
+
+- name: clarify_refuse_fails
+  expected: clarify
+  ambiguous_term: active users
+  response: {action: refuse, refusal_reason: "Ambiguous question."}
+  expect: fail
+
+- name: clarify_malformed_fails
+  expected: clarify
+  ambiguous_term: active users
+  response: malformed
+  expect: fail
+
+# --- expected: refuse (refusal items) ---
+- name: refuse_names_dimension_pass           # acquisition_channel ~ "acquisition channel"
+  expected: refuse
+  missing_dimension: acquisition_channel
+  response: {action: refuse, refusal_reason: "There is no acquisition channel data in this schema."}
+  expect: pass
+
+- name: refuse_generic_reason_fails
+  expected: refuse
+  missing_dimension: acquisition_channel
+  response: {action: refuse, refusal_reason: "I cannot answer this question."}
+  expect: fail
+
+- name: refuse_answer_fails
+  expected: refuse
+  missing_dimension: acquisition_channel
+  response: {action: answer, value: 9.0, sql: "SELECT 9"}
+  expect: fail
+
+- name: refuse_clarify_fails
+  expected: refuse
+  missing_dimension: acquisition_channel
+  response: {action: clarify, clarifying_question: "Which channel do you mean?"}
+  expect: fail
+
+- name: refuse_malformed_fails
+  expected: refuse
+  missing_dimension: acquisition_channel
+  response: malformed
+  expect: fail

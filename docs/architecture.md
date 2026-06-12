@@ -60,6 +60,30 @@ deterministic: the same seed yields an identical content digest (`world_digest`)
 seed changes the data but not the schema. See ADR-0002 and the
 [rulebook format reference](rulebook.md).
 
+## Contracts and scorer core (Phase 2)
+
+The five data contracts (Item, AgentRequest, AgentResponse, Verdict, RunManifest) are
+frozen pydantic models in `contracts/` — the dependency sink — with JSON Schemas exported
+to `docs/contracts/` and golden-tested against drift (see the
+[contracts reference](contracts.md)).
+
+The scorer core is three pure functions (no I/O, no globals, no clock):
+
+- `scorer/reconcile.py` — axis 1: relative tolerance (default 0.5%, per-item override),
+  exact match for counts, exact-zero rule at gold = 0.
+- `scorer/actions.py` — axes 3–4: the expected×actual action matrix; clarifications must
+  reference the ambiguous term, refusals must name the missing dimension, and refusing an
+  answerable item is flagged as over-refusal.
+- `scorer/aggregate.py` — item roll-up and the weighted suite score; `unknown` counts
+  against, `na` renormalizes, weights echoed in the output.
+
+"Who validates the validator" is answered by the **golden suite**
+(`tests/golden/scorer/`): hand-verified fixtures covering tolerance boundaries, every
+action-matrix cell, and malformed payloads, plus property tests (scale invariance,
+tolerance monotonicity, boundedness, parser never raises). The scorer core carries a
+CI-enforced 100% branch-coverage gate (`make cov-core`). Rules in
+[ADR-0003](decisions/ADR-0003.md).
+
 ## Module map
 
 Phase 0 scaffolds the full module tree under `src/ledgerbench/` as docstring-only stubs.

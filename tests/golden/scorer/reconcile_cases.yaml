@@ -1,0 +1,87 @@
+# Hand-verified reconciliation fixtures (axis 1, definitional). Default relative
+# tolerance is 0.005 (0.5%); boundary math worked out by hand per ADR-0003.
+- name: exact_match_numeric
+  agent_value: 48200.0
+  gold_value: 48200.0
+  expect: pass
+
+- name: just_inside_tolerance        # |10049-10000|/10000 = 0.0049 < 0.005
+  agent_value: 10049.0
+  gold_value: 10000.0
+  expect: pass
+
+- name: exactly_at_tolerance          # 50/10000 = 0.005 <= 0.005 (boundary inclusive)
+  agent_value: 10050.0
+  gold_value: 10000.0
+  expect: pass
+
+- name: just_outside_tolerance        # 51/10000 = 0.0051 > 0.005
+  agent_value: 10051.0
+  gold_value: 10000.0
+  expect: fail
+
+- name: fan_trap_triple_count         # the $100 order x 3 shipments = $300 case
+  agent_value: 300.0
+  gold_value: 100.0
+  expect: fail
+
+- name: negative_gold_within          # |-996 - -1000| / 1000 = 0.004
+  agent_value: -996.0
+  gold_value: -1000.0
+  expect: pass
+
+- name: sign_flip_fails               # 2000/1000 = 2.0
+  agent_value: -1000.0
+  gold_value: 1000.0
+  expect: fail
+
+- name: zero_gold_exact_pass          # relative tolerance undefined at zero; exact required
+  agent_value: 0.0
+  gold_value: 0.0
+  expect: pass
+
+- name: zero_gold_nonzero_fails
+  agent_value: 0.0001
+  gold_value: 0.0
+  expect: fail
+
+- name: custom_tolerance_wide         # 4/100 = 0.04 <= 0.05 override
+  agent_value: 104.0
+  gold_value: 100.0
+  tolerance: 0.05
+  expect: pass
+
+- name: custom_tolerance_exact_fails  # override 0: any nonzero diff fails
+  agent_value: 100.000001
+  gold_value: 100.0
+  tolerance: 0.0
+  expect: fail
+
+- name: count_exact_pass
+  agent_value: 42
+  gold_value: 42
+  value_type: count
+  expect: pass
+
+- name: count_float_form_pass         # 42.0 == 42; integral float form is fine
+  agent_value: 42.0
+  gold_value: 42
+  value_type: count
+  expect: pass
+
+- name: count_off_by_one_fails
+  agent_value: 41
+  gold_value: 42
+  value_type: count
+  expect: fail
+
+- name: count_fractional_fails
+  agent_value: 42.4
+  gold_value: 42
+  value_type: count
+  expect: fail
+
+- name: missing_value_fails
+  agent_value: null
+  gold_value: 5.0
+  expect: fail

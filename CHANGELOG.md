@@ -6,6 +6,28 @@ Semantic Versioning. `v1.0.0` is reserved for the public launch (Phase 8).
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-06-12
+
+### Added
+
+- Phase 2 (Contracts + scorer core): the five data contracts (Item, AgentRequest,
+  AgentResponse, Verdict, RunManifest) as frozen pydantic models, with JSON Schemas
+  exported to `docs/contracts/` (`make schemas`) and a golden test against silent drift.
+- `parse_agent_response`: untrusted-input gate — malformed agent output becomes a
+  `MalformedResponse` (scores zero, never raises); extras ignored, substance strict.
+- Scorer core (pure functions): `reconcile` (relative tolerance 0.5% default, exact
+  counts, exact-zero rule), `score_action` (full expected×actual matrix, term/dimension
+  matching, over-refusal flag), `aggregate` + `roll_up_item` (fail-closed, weights echoed).
+- Golden suite: 47 hand-verified fixtures (tolerance boundaries, every action-matrix
+  cell, malformed payloads, aggregate cases) + hypothesis property tests (scale
+  invariance, tolerance monotonicity, boundedness, parser never raises).
+- CI-enforced 100% branch-coverage gate on scorer core (`make cov-core`).
+- Docs: ADR-0003 (scoring rules), `docs/contracts.md`, architecture scorer section.
+
+### Changed
+
+- CI actions bumped (`checkout@v5`, `setup-python@v6`) to clear the Node 20 deprecation.
+
 ## [0.1.0] - 2026-06-11
 
 ### Added
@@ -42,6 +64,7 @@ Semantic Versioning. `v1.0.0` is reserved for the public launch (Phase 8).
   `.claude/settings.json` (`includeCoAuthoredBy: false`).
 - Placeholder test: package imports and `__version__` matches installed metadata.
 
-[Unreleased]: https://github.com/kartikeyamandhar/ledgerbench/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/kartikeyamandhar/ledgerbench/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/kartikeyamandhar/ledgerbench/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/kartikeyamandhar/ledgerbench/compare/v0.0.1...v0.1.0
 [0.0.1]: https://github.com/kartikeyamandhar/ledgerbench/releases/tag/v0.0.1
