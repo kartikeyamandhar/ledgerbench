@@ -20,6 +20,7 @@ from typing import TYPE_CHECKING
 from pydantic import ValidationError
 
 from ledgerbench.contracts.item import Item
+from ledgerbench.errors import LedgerBenchError
 from ledgerbench.gold.compiler import compute_gold
 from ledgerbench.ingestion.rulebook import Rulebook
 
@@ -161,3 +162,87 @@ def validate_items(
                     report.errors.append(f"{item.id}: gold recomputation failed: {exc}")
 
     return report
+
+
+# --- Phase 7: suite generation from a dbt project ---------------------------------
+
+
+@dataclass(frozen=True)
+class CoverageReport:
+    """Which trap classes could be generated for this project, and why not.
+
+    The honesty artifact of BYO mode: where a project declares too little for a
+    class, the report says so instead of fabricating semantics (RT-016).
+    """
+
+    generated: dict[str, int]
+    skipped: dict[str, str]
+
+    def render(self) -> str:
+        """Human-readable coverage summary for the CLI."""
+        lines = ["trap-class coverage:"]
+        for klass, count in sorted(self.generated.items()):
+            lines.append(f"  {klass:13s} {count} item(s)")
+        for klass, reason in sorted(self.skipped.items()):
+            lines.append(f"  {klass:13s} SKIPPED -- {reason}")
+        return "\n".join(lines)
+
+
+def generate_suite(
+    semantics: object,
+    con: duckdb.DuckDBPyConnection,
+) -> tuple[list[Item], CoverageReport]:
+    """Generate a trap suite from parsed dbt semantics; lint before returning.
+
+    Args:
+        semantics: A :class:`~ledgerbench.ingestion.dbt_manifest.DbtSemantics`
+            (typed loosely to avoid an import cycle; the generators check).
+        con: Read-only warehouse connection (used only for the period
+            generator's min/max probes).
+
+    Returns:
+        The generated items plus the per-class coverage report. The generated
+        suite is validated with :func:`validate_items` before being returned;
+        a generator emitting an invalid item is a bug, not a user error.
+    """
+    from ledgerbench.generator.traps import (
+        ambiguity,
+        controls,
+        definitional,
+        grain,
+        period,
+        refusal,
+    )
+    from ledgerbench.ingestion.dbt_manifest import DbtSemantics
+
+    assert isinstance(semantics, DbtSemantics)
+    generated: dict[str, int] = {}
+    skipped: dict[str, str] = {}
+    items: list[Item] = []
+
+    classwise: list[tuple[str, tuple[list[Item], str | None]]] = [
+        ("definitional", definitional.generate(semantics)),
+        ("grain", grain.generate(semantics)),
+        ("ambiguity", ambiguity.generate(semantics)),
+        ("refusal", refusal.generate(semantics)),
+        ("period", period.generate(semantics, con)),
+        ("control", controls.generate(semantics)),
+    ]
+    for klass, (class_items, reason) in classwise:
+        if reason is not None:
+            skipped[klass] = reason
+        else:
+            generated[klass] = len(class_items)
+            items.extend(class_items)
+
+    report = validate_items(
+        items,
+        {semantics.project_name: semantics},  # type: ignore[dict-item]
+        connections={semantics.project_name: con},
+    )
+    if not report.ok:
+        raise LedgerBenchError(
+            "generator produced an invalid suite (a bug, not your project):\n"
+            + "\n".join(report.errors)
+        )
+    return items, CoverageReport(generated=generated, skipped=skipped)
