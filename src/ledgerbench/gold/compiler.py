@@ -103,3 +103,33 @@ def compute_gold(
     if definition.value_type == "count" and gold != int(gold):
         raise LedgerBenchError(f"count gold for {definition.id!r} is fractional: {gold}")
     return gold
+
+
+def connect_warehouse(url: str) -> duckdb.DuckDBPyConnection:
+    """Open a read-only connection to the user's warehouse from a URL.
+
+    v1 supports ``duckdb:///absolute/path.duckdb`` (and a bare filesystem
+    path). The adapter seam for other warehouses is this function's signature;
+    Snowflake lands post-launch (RT-001).
+
+    Raises:
+        LedgerBenchError: unsupported scheme or unreadable database, with the
+            supported form spelled out.
+    """
+    import duckdb as _duckdb
+
+    if url.startswith("duckdb://"):
+        path = url.removeprefix("duckdb://").lstrip("/")
+        path = f"/{path}" if not path.startswith("/") else path
+    elif "://" in url:
+        scheme = url.split("://", 1)[0]
+        raise LedgerBenchError(
+            f"unsupported warehouse scheme {scheme!r}; v1 supports "
+            f"duckdb:////absolute/path.duckdb (Snowflake is post-launch)"
+        )
+    else:
+        path = url
+    try:
+        return _duckdb.connect(path, read_only=True)
+    except Exception as exc:
+        raise LedgerBenchError(f"cannot open warehouse {path!r} read-only: {exc}") from exc

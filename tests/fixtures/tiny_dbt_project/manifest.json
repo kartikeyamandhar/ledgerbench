@@ -1,0 +1,276 @@
+{
+ "metadata": {
+  "dbt_schema_version": "https://schemas.getdbt.com/dbt/manifest/v12.json",
+  "project_name": "tiny_shop"
+ },
+ "nodes": {
+  "model.tiny_shop.customers": {
+   "columns": {
+    "customer_id": {
+     "data_type": "integer",
+     "name": "customer_id"
+    },
+    "region": {
+     "data_type": "varchar",
+     "name": "region"
+    }
+   },
+   "config": {
+    "meta": {}
+   },
+   "database": "tiny",
+   "meta": {},
+   "name": "customers",
+   "resource_type": "model",
+   "schema": "main",
+   "unique_id": "model.tiny_shop.customers"
+  },
+  "model.tiny_shop.order_items": {
+   "columns": {
+    "item_id": {
+     "data_type": "integer",
+     "name": "item_id"
+    },
+    "order_id": {
+     "data_type": "integer",
+     "name": "order_id"
+    },
+    "quantity": {
+     "data_type": "integer",
+     "name": "quantity"
+    }
+   },
+   "config": {
+    "meta": {}
+   },
+   "database": "tiny",
+   "meta": {},
+   "name": "order_items",
+   "resource_type": "model",
+   "schema": "main",
+   "unique_id": "model.tiny_shop.order_items"
+  },
+  "model.tiny_shop.orders": {
+   "columns": {
+    "amount": {
+     "data_type": "decimal(10,2)",
+     "name": "amount"
+    },
+    "customer_id": {
+     "data_type": "integer",
+     "name": "customer_id"
+    },
+    "order_id": {
+     "data_type": "integer",
+     "name": "order_id"
+    },
+    "order_ts": {
+     "data_type": "timestamp",
+     "name": "order_ts"
+    },
+    "refunded": {
+     "data_type": "boolean",
+     "name": "refunded"
+    },
+    "status": {
+     "data_type": "varchar",
+     "name": "status"
+    }
+   },
+   "config": {
+    "meta": {
+     "ledgerbench": {
+      "metrics": [
+       {
+        "description": "Net revenue from completed, non-refunded orders.",
+        "exclusions": [
+         "refunded = true"
+        ],
+        "filters": [
+         "status = 'completed'"
+        ],
+        "id": "revenue_net",
+        "measure": "sum(amount)",
+        "time_column": "order_ts",
+        "value_type": "numeric"
+       },
+       {
+        "description": "Gross revenue across all orders.",
+        "id": "revenue_gross",
+        "measure": "sum(amount)",
+        "time_column": "order_ts",
+        "value_type": "numeric"
+       },
+       {
+        "description": "Total number of orders.",
+        "id": "order_count",
+        "measure": "count(*)",
+        "value_type": "count"
+       }
+      ]
+     },
+     "ledgerbench_project": {
+      "absent_dimensions": [
+       "acquisition_channel"
+      ],
+      "ambiguous_terms": [
+       {
+        "readings": [
+         "revenue_gross",
+         "revenue_net"
+        ],
+        "term": "revenue"
+       }
+      ],
+      "fiscal_year_start_month": 1,
+      "reporting_timezone": "America/New_York"
+     }
+    }
+   },
+   "database": "tiny",
+   "meta": {
+    "ledgerbench": {
+     "metrics": [
+      {
+       "description": "Net revenue from completed, non-refunded orders.",
+       "exclusions": [
+        "refunded = true"
+       ],
+       "filters": [
+        "status = 'completed'"
+       ],
+       "id": "revenue_net",
+       "measure": "sum(amount)",
+       "time_column": "order_ts",
+       "value_type": "numeric"
+      },
+      {
+       "description": "Gross revenue across all orders.",
+       "id": "revenue_gross",
+       "measure": "sum(amount)",
+       "time_column": "order_ts",
+       "value_type": "numeric"
+      },
+      {
+       "description": "Total number of orders.",
+       "id": "order_count",
+       "measure": "count(*)",
+       "value_type": "count"
+      }
+     ]
+    },
+    "ledgerbench_project": {
+     "absent_dimensions": [
+      "acquisition_channel"
+     ],
+     "ambiguous_terms": [
+      {
+       "readings": [
+        "revenue_gross",
+        "revenue_net"
+       ],
+       "term": "revenue"
+      }
+     ],
+     "fiscal_year_start_month": 1,
+     "reporting_timezone": "America/New_York"
+    }
+   },
+   "name": "orders",
+   "resource_type": "model",
+   "schema": "main",
+   "unique_id": "model.tiny_shop.orders"
+  },
+  "test.tiny_shop.relationships_order_items_order_id": {
+   "attached_node": "model.tiny_shop.order_items",
+   "depends_on": {
+    "nodes": [
+     "model.tiny_shop.order_items",
+     "model.tiny_shop.orders"
+    ]
+   },
+   "name": "relationships_order_items_order_id",
+   "resource_type": "test",
+   "test_metadata": {
+    "kwargs": {
+     "column_name": "order_id",
+     "field": "order_id",
+     "to": "ref('orders')"
+    },
+    "name": "relationships"
+   },
+   "unique_id": "test.tiny_shop.relationships_order_items_order_id"
+  },
+  "test.tiny_shop.relationships_orders_customer_id": {
+   "attached_node": "model.tiny_shop.orders",
+   "depends_on": {
+    "nodes": [
+     "model.tiny_shop.orders",
+     "model.tiny_shop.customers"
+    ]
+   },
+   "name": "relationships_orders_customer_id",
+   "resource_type": "test",
+   "test_metadata": {
+    "kwargs": {
+     "column_name": "customer_id",
+     "field": "customer_id",
+     "to": "ref('customers')"
+    },
+    "name": "relationships"
+   },
+   "unique_id": "test.tiny_shop.relationships_orders_customer_id"
+  },
+  "test.tiny_shop.unique_customers_customer_id": {
+   "attached_node": "model.tiny_shop.customers",
+   "depends_on": {
+    "nodes": [
+     "model.tiny_shop.customers"
+    ]
+   },
+   "name": "unique_customers_customer_id",
+   "resource_type": "test",
+   "test_metadata": {
+    "kwargs": {
+     "column_name": "customer_id"
+    },
+    "name": "unique"
+   },
+   "unique_id": "test.tiny_shop.unique_customers_customer_id"
+  },
+  "test.tiny_shop.unique_order_items_item_id": {
+   "attached_node": "model.tiny_shop.order_items",
+   "depends_on": {
+    "nodes": [
+     "model.tiny_shop.order_items"
+    ]
+   },
+   "name": "unique_order_items_item_id",
+   "resource_type": "test",
+   "test_metadata": {
+    "kwargs": {
+     "column_name": "item_id"
+    },
+    "name": "unique"
+   },
+   "unique_id": "test.tiny_shop.unique_order_items_item_id"
+  },
+  "test.tiny_shop.unique_orders_order_id": {
+   "attached_node": "model.tiny_shop.orders",
+   "depends_on": {
+    "nodes": [
+     "model.tiny_shop.orders"
+    ]
+   },
+   "name": "unique_orders_order_id",
+   "resource_type": "test",
+   "test_metadata": {
+    "kwargs": {
+     "column_name": "order_id"
+    },
+    "name": "unique"
+   },
+   "unique_id": "test.tiny_shop.unique_orders_order_id"
+  }
+ }
+}

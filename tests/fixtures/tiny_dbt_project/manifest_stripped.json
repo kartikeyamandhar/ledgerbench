@@ -1,0 +1,91 @@
+{
+ "metadata": {
+  "dbt_schema_version": "https://schemas.getdbt.com/dbt/manifest/v12.json",
+  "project_name": "tiny_shop"
+ },
+ "nodes": {
+  "model.tiny_shop.customers": {
+   "columns": {
+    "customer_id": {
+     "data_type": "integer",
+     "name": "customer_id"
+    },
+    "region": {
+     "data_type": "varchar",
+     "name": "region"
+    }
+   },
+   "config": {
+    "meta": {}
+   },
+   "database": "tiny",
+   "meta": {},
+   "name": "customers",
+   "resource_type": "model",
+   "schema": "main",
+   "unique_id": "model.tiny_shop.customers"
+  },
+  "model.tiny_shop.order_items": {
+   "columns": {
+    "item_id": {
+     "data_type": "integer",
+     "name": "item_id"
+    },
+    "order_id": {
+     "data_type": "integer",
+     "name": "order_id"
+    },
+    "quantity": {
+     "data_type": "integer",
+     "name": "quantity"
+    }
+   },
+   "config": {
+    "meta": {}
+   },
+   "database": "tiny",
+   "meta": {},
+   "name": "order_items",
+   "resource_type": "model",
+   "schema": "main",
+   "unique_id": "model.tiny_shop.order_items"
+  },
+  "model.tiny_shop.orders": {
+   "columns": {
+    "amount": {
+     "data_type": "decimal(10,2)",
+     "name": "amount"
+    },
+    "customer_id": {
+     "data_type": "integer",
+     "name": "customer_id"
+    },
+    "order_id": {
+     "data_type": "integer",
+     "name": "order_id"
+    },
+    "order_ts": {
+     "data_type": "timestamp",
+     "name": "order_ts"
+    },
+    "refunded": {
+     "data_type": "boolean",
+     "name": "refunded"
+    },
+    "status": {
+     "data_type": "varchar",
+     "name": "status"
+    }
+   },
+   "config": {
+    "meta": {}
+   },
+   "database": "tiny",
+   "meta": {},
+   "name": "orders",
+   "resource_type": "model",
+   "schema": "main",
+   "unique_id": "model.tiny_shop.orders"
+  }
+ }
+}

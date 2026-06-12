@@ -469,3 +469,128 @@ def report(
         for con in connections.values():
             con.close()
     _console.print(f"[green]re-rendered[/green] {result.path} ({result.size_bytes / 1024:.0f} KiB)")
+
+
+# --- Phase 7: BYO mode ------------------------------------------------------------
+
+
+@app.command("generate")
+def generate(
+    manifest: Path = typer.Option(  # noqa: B008 - typer evaluates defaults at import
+        ..., "--manifest", help="Path to the dbt project's manifest.json."
+    ),
+    warehouse: str = typer.Option(
+        ..., "--warehouse", help="Read-only warehouse URL (duckdb:////absolute/path.duckdb)."
+    ),
+    out: Path = typer.Option(  # noqa: B008
+        Path("generated_items.jsonl"), "--out", help="Where to write the generated suite."
+    ),
+) -> None:
+    """Generate an adversarial suite from a dbt project's declared semantics.
+
+    Reads only what the project declares (metrics, tests, meta blocks); where a
+    trap class cannot be generated, the coverage report says why -- nothing is
+    fabricated. The warehouse is touched read-only, through the same SELECT-only
+    gate as agent SQL.
+    """
+    from ledgerbench.errors import LedgerBenchError
+    from ledgerbench.generator.suite import generate_suite
+    from ledgerbench.gold.compiler import connect_warehouse
+    from ledgerbench.ingestion.dbt_manifest import load_dbt_manifest
+
+    try:
+        semantics = load_dbt_manifest(manifest)
+        con = connect_warehouse(warehouse)
+    except LedgerBenchError as exc:
+        _console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(code=2) from exc
+
+    try:
+        items, coverage = generate_suite(semantics, con)
+    finally:
+        con.close()
+
+    out.parent.mkdir(parents=True, exist_ok=True)
+    with out.open("w", encoding="utf-8") as handle:
+        for item in items:
+            handle.write(item.model_dump_json(exclude_none=True) + "\n")
+
+    _console.print(coverage.render())
+    _console.print(
+        f"\n[green]generated {len(items)} items[/green] -> {out}\n"
+        f"Next: [bold]ledgerbench review {out}[/bold] to approve the ambiguity and "
+        f"refusal items (only you can judge those), then run your agent against the "
+        f"frozen suite."
+    )
+
+
+@app.command("review")
+def review(
+    suite: Path = typer.Argument(..., help="Generated suite JSONL to review."),  # noqa: B008
+    out: Path = typer.Option(  # noqa: B008
+        Path("approved_items.jsonl"), "--out", help="Where to write the approved suite."
+    ),
+    approve_all: bool = typer.Option(
+        False,
+        "--approve-all",
+        help="Non-interactive: approve every pending item (CI / scripting).",
+    ),
+) -> None:
+    """Walk generated ambiguity/refusal items; approve, edit, or reject each.
+
+    Decisions persist in a sidecar (<suite>.decisions.json) keyed by item id,
+    so re-running skips what you already decided -- the review is idempotent.
+    Approvals freeze into the output suite; other classes pass through.
+    """
+    import json
+
+    from ledgerbench.generator.suite import load_bank
+
+    if not suite.is_file():
+        _console.print(f"[red]suite not found:[/red] {suite}")
+        raise typer.Exit(code=2)
+    items = load_bank(suite)
+    sidecar = suite.with_suffix(suite.suffix + ".decisions.json")
+    decisions: dict[str, dict[str, str]] = (
+        json.loads(sidecar.read_text(encoding="utf-8")) if sidecar.is_file() else {}
+    )
+
+    needs_review = [i for i in items if i.trap_class in ("ambiguity", "refusal")]
+    pending = [i for i in needs_review if i.id not in decisions]
+    _console.print(
+        f"{len(items)} items; {len(needs_review)} need review; "
+        f"{len(needs_review) - len(pending)} already decided; {len(pending)} pending."
+    )
+    for item in pending:
+        if approve_all:
+            decisions[item.id] = {"action": "approve"}
+            continue
+        _console.print(f"\n[bold]{item.id}[/bold] ({item.trap_class}): {item.question}")
+        _console.print(f"  rubric: {item.rubric}")
+        choice = typer.prompt("approve / edit / reject [a/e/r]", default="a").lower()
+        if choice.startswith("e"):
+            new_question = typer.prompt("edited question", default=item.question)
+            decisions[item.id] = {"action": "edit", "question": new_question}
+        elif choice.startswith("r"):
+            decisions[item.id] = {"action": "reject"}
+        else:
+            decisions[item.id] = {"action": "approve"}
+
+    sidecar.write_text(json.dumps(decisions, indent=1, sort_keys=True), encoding="utf-8")
+
+    approved = []
+    for item in items:
+        decision = decisions.get(item.id, {"action": "approve"})
+        if decision["action"] == "reject":
+            continue
+        if decision["action"] == "edit":
+            item = item.model_copy(update={"question": decision["question"]})
+        approved.append(item)
+
+    out.parent.mkdir(parents=True, exist_ok=True)
+    with out.open("w", encoding="utf-8") as handle:
+        for item in approved:
+            handle.write(item.model_dump_json(exclude_none=True) + "\n")
+    _console.print(
+        f"[green]froze {len(approved)} approved items[/green] -> {out} (decisions: {sidecar.name})"
+    )

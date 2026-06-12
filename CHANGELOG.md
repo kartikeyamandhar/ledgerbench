@@ -6,6 +6,35 @@ Semantic Versioning. `v1.0.0` is reserved for the public launch (Phase 8).
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-06-12
+
+### Added
+
+- Phase 7 (BYO mode): point the engine at a real dbt project. The central bet cashed —
+  `ingestion/dbt_manifest.py` compiles a manifest (schema v11–v12, version-fenced with
+  actionable failures) into the *same* `DefinitionRegistry`/`GrainModel` the bundled
+  worlds use, so everything downstream runs unchanged.
+- Extraction from declared semantics only: models → tables; `unique` tests → grains
+  (fail-closed sentinel when undeclared); `relationships` tests → cardinalities;
+  `meta.ledgerbench.metrics` → metric definitions; `meta.ledgerbench_project` →
+  timezone/fiscal/ambiguous-terms/absent-dimensions declarations (verified, e.g. a
+  declared-absent dimension that exists is rejected).
+- `generator/traps/*`: six deterministic per-class generators (no LLM anywhere);
+  `generate_suite` lints its own output and returns a per-class **coverage report** —
+  classes that cannot be generated are skipped with the reason, never fabricated.
+  Fixture yields 28 traps, 20 with recomputed gold; the stripped fixture degrades to
+  zero items with six named reasons.
+- `ledgerbench generate` (prints coverage, writes the suite) and `ledgerbench review`
+  (interactive approve/edit/reject for ambiguity/refusal items; `--approve-all` for
+  automation; decisions persist in a sidecar — idempotent, byte-identical re-freeze).
+- `gold/compiler.py::connect_warehouse`: read-only `duckdb://` URLs in v1; other
+  schemes fail with the Snowflake-post-launch message (the adapter seam, RT-001).
+- `tests/fixtures/tiny_dbt_project/`: committed models + schema.yml + hand-trimmed
+  manifest (plus a stripped variant) + deterministic warehouse builder; full BYO e2e
+  (generate → review → run naive → score → report) runs offline in CI.
+- `docs/byo.md`: the guide, read-only role requirement up top.
+
+
 ## [0.6.0] - 2026-06-12
 
 ### Added
@@ -158,7 +187,8 @@ Semantic Versioning. `v1.0.0` is reserved for the public launch (Phase 8).
   `.claude/settings.json` (`includeCoAuthoredBy: false`).
 - Placeholder test: package imports and `__version__` matches installed metadata.
 
-[Unreleased]: https://github.com/kartikeyamandhar/ledgerbench/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/kartikeyamandhar/ledgerbench/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/kartikeyamandhar/ledgerbench/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/kartikeyamandhar/ledgerbench/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/kartikeyamandhar/ledgerbench/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/kartikeyamandhar/ledgerbench/compare/v0.3.0...v0.4.0
