@@ -1,0 +1,111 @@
+# Hand-labeled faithfulness calibration set (20 cases). Each pairs one SQL
+# query with one stated assumption and the human label: supported |
+# contradicted | unrelated. CI uses these to pin the extractor and plumbing;
+# the LIVE judge-agreement measurement (gate >= 0.8) runs via
+# scripts/judge_calibration.py and requires an API key (pre-launch step).
+
+- name: exclusion_stated_and_present
+  sql: "SELECT sum(amount) FROM orders WHERE status = 'completed' AND NOT refunded"
+  assumption: "Excluded refunded orders"
+  label: supported
+
+- name: exclusion_stated_but_absent
+  sql: "SELECT sum(amount) FROM orders"
+  assumption: "Excluded refunded orders"
+  label: contradicted
+
+- name: filter_stated_and_present
+  sql: "SELECT sum(amount) FROM orders WHERE status = 'completed'"
+  assumption: "Only counted completed orders"
+  label: supported
+
+- name: filter_stated_wrong_value
+  sql: "SELECT sum(amount) FROM orders WHERE status = 'pending'"
+  assumption: "Only counted completed orders"
+  label: contradicted
+
+- name: date_window_stated_and_present
+  sql: >
+    SELECT sum(amount) FROM orders
+    WHERE order_ts >= TIMESTAMP '2026-03-01' AND order_ts < TIMESTAMP '2026-04-01'
+  assumption: "Limited to March 2026"
+  label: supported
+
+- name: date_window_stated_but_absent
+  sql: "SELECT sum(amount) FROM orders WHERE status = 'completed'"
+  assumption: "Limited to March 2026"
+  label: contradicted
+
+- name: join_stated_and_present
+  sql: >
+    SELECT c.region, sum(o.amount) FROM orders o
+    JOIN customers c ON o.customer_id = c.customer_id GROUP BY c.region
+  assumption: "Joined orders to customers to get regions"
+  label: supported
+
+- name: join_stated_but_absent
+  sql: "SELECT sum(amount) FROM orders"
+  assumption: "Joined to the customers table for region data"
+  label: contradicted
+
+- name: aggregate_kind_matches
+  sql: "SELECT count(*) FROM orders"
+  assumption: "Counted all order rows"
+  label: supported
+
+- name: aggregate_kind_conflicts
+  sql: "SELECT sum(amount) FROM orders"
+  assumption: "Counted the number of orders rather than summing amounts"
+  label: contradicted
+
+- name: distinct_stated_and_present
+  sql: "SELECT count(DISTINCT user_id) FROM events"
+  assumption: "Counted distinct users, not raw events"
+  label: supported
+
+- name: distinct_stated_but_absent
+  sql: "SELECT count(user_id) FROM events"
+  assumption: "Counted distinct users, not raw events"
+  label: contradicted
+
+- name: currency_context_unrelated
+  sql: "SELECT sum(amount) FROM orders WHERE status = 'completed'"
+  assumption: "Amounts are in USD"
+  label: unrelated
+
+- name: business_context_unrelated
+  sql: "SELECT sum(amount) FROM transactions WHERE status = 'posted'"
+  assumption: "Posted status means the transaction cleared the bank"
+  label: unrelated
+
+- name: subquery_restriction_supported
+  sql: >
+    SELECT sum(amount) FROM orders
+    WHERE order_id IN (SELECT order_id FROM shipments)
+  assumption: "Restricted to orders that have at least one shipment"
+  label: supported
+
+- name: subquery_restriction_absent
+  sql: "SELECT sum(amount) FROM orders WHERE status = 'completed'"
+  assumption: "Restricted to orders that have shipped"
+  label: contradicted
+
+- name: void_exclusion_supported
+  sql: "SELECT sum(amount) FROM transactions WHERE status <> 'void'"
+  assumption: "Voided transactions were excluded"
+  label: supported
+
+- name: pending_included_despite_claim
+  sql: "SELECT sum(amount) FROM transactions WHERE status <> 'void'"
+  assumption: "Excluded both void and pending transactions"
+  label: contradicted
+
+- name: grouping_stated_and_present
+  sql: "SELECT region, sum(amount) FROM orders GROUP BY region"
+  assumption: "Broke the total down by region"
+  label: supported
+
+- name: timezone_handling_unrelated
+  sql: "SELECT count(*) FROM events WHERE event_ts >= TIMESTAMP '2026-05-25'"
+  assumption: "Timestamps are interpreted in the warehouse default timezone"
+  label: unrelated
