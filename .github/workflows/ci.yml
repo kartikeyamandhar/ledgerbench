@@ -22,10 +22,10 @@ jobs:
       matrix:
         python-version: ["3.11", "3.12"]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
@@ -49,3 +49,9 @@ jobs:
 
       - name: Tests + coverage gate
         run: pytest --cov=ledgerbench --cov-branch --cov-report=term-missing
+
+      - name: Scorer-core 100% branch gate
+        run: >
+          pytest tests/unit tests/golden/scorer -q
+          --cov=ledgerbench.scorer.reconcile --cov=ledgerbench.scorer.actions
+          --cov=ledgerbench.scorer.aggregate --cov-branch --cov-fail-under=100

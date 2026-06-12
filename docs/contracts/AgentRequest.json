@@ -1,0 +1,73 @@
+{
+  "$defs": {
+    "Budget": {
+      "additionalProperties": false,
+      "description": "Per-item budget the adapter must respect.",
+      "properties": {
+        "max_calls": {
+          "minimum": 1,
+          "title": "Max Calls",
+          "type": "integer"
+        },
+        "timeout_s": {
+          "exclusiveMinimum": 0,
+          "title": "Timeout S",
+          "type": "number"
+        }
+      },
+      "required": [
+        "max_calls",
+        "timeout_s"
+      ],
+      "title": "Budget",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "What the runner sends to an adapter for one item.",
+  "properties": {
+    "budget": {
+      "$ref": "#/$defs/Budget"
+    },
+    "context_pack": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Context Pack"
+    },
+    "dialect": {
+      "default": "duckdb",
+      "title": "Dialect",
+      "type": "string"
+    },
+    "item_id": {
+      "minLength": 1,
+      "title": "Item Id",
+      "type": "string"
+    },
+    "question": {
+      "minLength": 1,
+      "title": "Question",
+      "type": "string"
+    },
+    "schema_ddl": {
+      "minLength": 1,
+      "title": "Schema Ddl",
+      "type": "string"
+    }
+  },
+  "required": [
+    "item_id",
+    "question",
+    "schema_ddl",
+    "budget"
+  ],
+  "title": "AgentRequest",
+  "type": "object"
+}

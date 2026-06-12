@@ -1,0 +1,164 @@
+{
+  "$defs": {
+    "GoldRecipe": {
+      "additionalProperties": false,
+      "description": "How to recompute an item's gold from the rulebook: metric id plus params.",
+      "properties": {
+        "metric_id": {
+          "minLength": 1,
+          "title": "Metric Id",
+          "type": "string"
+        },
+        "params": {
+          "additionalProperties": {
+            "$ref": "#/$defs/JsonValue"
+          },
+          "title": "Params",
+          "type": "object"
+        }
+      },
+      "required": [
+        "metric_id"
+      ],
+      "title": "GoldRecipe",
+      "type": "object"
+    },
+    "JsonValue": {}
+  },
+  "additionalProperties": false,
+  "description": "One benchmark question with everything needed to grade it mechanically.\n\n``ambiguous_term`` and ``missing_dimension`` exist so the action scorer can\ncheck *mechanically* that a clarification references the actual ambiguous\nterm and a refusal names the actual missing dimension (see ADR-0003).",
+  "properties": {
+    "ambiguous_term": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Ambiguous Term"
+    },
+    "declared_grain": {
+      "anyOf": [
+        {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Declared Grain"
+    },
+    "expected_action": {
+      "enum": [
+        "answer",
+        "clarify",
+        "refuse"
+      ],
+      "title": "Expected Action",
+      "type": "string"
+    },
+    "gold_recipe": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/GoldRecipe"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "gold_value": {
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Gold Value"
+    },
+    "id": {
+      "minLength": 1,
+      "title": "Id",
+      "type": "string"
+    },
+    "missing_dimension": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Missing Dimension"
+    },
+    "question": {
+      "minLength": 1,
+      "title": "Question",
+      "type": "string"
+    },
+    "rubric": {
+      "minLength": 1,
+      "title": "Rubric",
+      "type": "string"
+    },
+    "tolerance_override": {
+      "anyOf": [
+        {
+          "minimum": 0.0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Tolerance Override"
+    },
+    "trap_class": {
+      "enum": [
+        "definitional",
+        "grain",
+        "ambiguity",
+        "refusal",
+        "period",
+        "control"
+      ],
+      "title": "Trap Class",
+      "type": "string"
+    },
+    "version": {
+      "minLength": 1,
+      "title": "Version",
+      "type": "string"
+    },
+    "world": {
+      "minLength": 1,
+      "title": "World",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "world",
+    "question",
+    "trap_class",
+    "expected_action",
+    "rubric",
+    "version"
+  ],
+  "title": "Item",
+  "type": "object"
+}

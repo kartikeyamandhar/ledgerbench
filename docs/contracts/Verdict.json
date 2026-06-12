@@ -1,0 +1,76 @@
+{
+  "$defs": {
+    "AxisResult": {
+      "additionalProperties": false,
+      "description": "The outcome of one axis for one item, with self-explaining evidence.",
+      "properties": {
+        "evidence": {
+          "additionalProperties": {
+            "$ref": "#/$defs/JsonValue"
+          },
+          "title": "Evidence",
+          "type": "object"
+        },
+        "status": {
+          "enum": [
+            "pass",
+            "fail",
+            "na",
+            "unknown"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "status"
+      ],
+      "title": "AxisResult",
+      "type": "object"
+    },
+    "JsonValue": {}
+  },
+  "additionalProperties": false,
+  "description": "All axis results for one item, plus the item-level roll-up.\n\nThe roll-up is computed by ``scorer.aggregate.roll_up_item`` (fail beats\nunknown beats pass beats na) and stored so traces are self-contained.",
+  "properties": {
+    "axes": {
+      "additionalProperties": {
+        "$ref": "#/$defs/AxisResult"
+      },
+      "minProperties": 1,
+      "propertyNames": {
+        "enum": [
+          "definitional",
+          "grain",
+          "ambiguity",
+          "refusal",
+          "faithfulness"
+        ]
+      },
+      "title": "Axes",
+      "type": "object"
+    },
+    "item_id": {
+      "minLength": 1,
+      "title": "Item Id",
+      "type": "string"
+    },
+    "roll_up": {
+      "enum": [
+        "pass",
+        "fail",
+        "na",
+        "unknown"
+      ],
+      "title": "Roll Up",
+      "type": "string"
+    }
+  },
+  "required": [
+    "item_id",
+    "axes",
+    "roll_up"
+  ],
+  "title": "Verdict",
+  "type": "object"
+}
