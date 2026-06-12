@@ -25,9 +25,24 @@ from ledgerbench.errors import WorldBuildError
 BuildFn = Callable[[Any, int], None]
 """Signature of a world generator's ``build(con, seed)`` entry point."""
 
-_REPO_ROOT = Path(__file__).resolve().parents[2]
+
+def _resolve_repo_root() -> Path:
+    """Source checkout root when running from the repo; CWD for wheel installs.
+
+    From a checkout, worlds live two levels above this file. From a wheel
+    (pip/Docker), that path lands inside site-packages, so we fall back to the
+    working directory -- which is where the demo's data files are documented
+    to live (the Docker image copies them there).
+    """
+    candidate = Path(__file__).resolve().parents[2]
+    if (candidate / "benchmark" / "worlds").is_dir():
+        return candidate
+    return Path.cwd()
+
+
+_REPO_ROOT = _resolve_repo_root()
 WORLDS_DIR = _REPO_ROOT / "benchmark" / "worlds"
-"""Directory holding the bundled worlds (resolved relative to the source tree)."""
+"""Directory holding the bundled worlds (source tree, else the working directory)."""
 
 DEFAULT_OUTPUT_DIR = _REPO_ROOT / ".ledgerbench" / "worlds"
 """Default location for built ``.duckdb`` files (gitignored)."""

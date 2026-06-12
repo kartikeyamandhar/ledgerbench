@@ -28,17 +28,25 @@ answer was right" across five axes — and ships the chart that shows it.
 - **Demo / benchmark** — a bundled deterministic fake company where every true answer is known by construction. The public benchmark.
 - **BYO** — point the engine at a real dbt project, auto-generate the adversarial suite from your declared semantics, compute gold read-only, and grade your agent.
 
+## The finding (v1.0, floor tier)
+
+On the 150-item public bank, the deterministic offline baseline's queries **ran fine
+100% of the time and were business-correct 9.3% of the time** — identically in closed
+and open book, because the floor doesn't read documentation
+([committed manifests](benchmark/results/)). Execution success and business
+correctness are different quantities; this benchmark measures the distance for real
+agents. Frontier-agent rows (Anthropic/OpenAI × closed/open × 3 seeds) land via
+`scripts/run_benchmark.py` once API keys are configured — nothing is projected in
+advance. **Leaderboard:** https://kartikeyamandhar.github.io/ledgerbench/ ·
+**Technical report:** [docs/report.md](docs/report.md)
+
 ## Status
 
-Phases 0–6 are complete: deterministic worlds, frozen contracts, the golden-tested
-scorer (all five axes), the fail-closed static grain checker (TPR 1.000 / FPR 0.000 on its
-published corpus), the SELECT-only sandboxed runner with kill-tests, the 150-item public
-bank with recipe-derived gold, and the end-to-end CLI + single-file report. Remaining:
-BYO/dbt mode (Phase 7) and launch packaging (Phase 8).
-
-```bash
-ledgerbench world build --world all --seed 42   # build the bundled worlds locally
-```
+v1.0.0 — all eight phases complete: deterministic worlds, frozen contracts, the
+golden-tested five-axis scorer, the fail-closed grain checker (TPR 1.000 / FPR 0.000 on
+its published corpus), the SELECT-only sandboxed runner with kill-tests, the 150-item
+bank with recipe-derived gold, the five-minute demo, BYO/dbt mode
+([guide](docs/byo.md)), and release packaging.
 
 ## Quickstart
 

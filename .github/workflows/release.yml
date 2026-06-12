@@ -1,0 +1,75 @@
+name: release
+
+# Tag v* -> build + verify -> PyPI (trusted publishing) + Docker image to GHCR.
+# PyPI publishing requires the one-time trusted-publisher registration on
+# pypi.org (owner punch list); until then that job fails cleanly while the
+# GHCR job still ships the image.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Build sdist and wheel
+        run: |
+          python -m pip install --upgrade pip build twine
+          python -m build
+          python -m twine check dist/*
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  pypi:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write  # OIDC trusted publishing; no stored secret
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - name: Publish to PyPI (trusted publishing)
+        uses: pypa/gh-action-pypi-publish@release/v1
+
+  docker:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build image
+        run: docker build -t ghcr.io/${{ github.repository }}:${{ github.ref_name }} .
+      - name: Container smoke test (offline demo subset)
+        run: >
+          docker run --rm ghcr.io/${{ github.repository }}:${{ github.ref_name }}
+          demo --limit 10 --no-open
+      - name: Push image
+        run: |
+          docker push ghcr.io/${{ github.repository }}:${{ github.ref_name }}
+          docker tag ghcr.io/${{ github.repository }}:${{ github.ref_name }} \
+                     ghcr.io/${{ github.repository }}:latest
+          docker push ghcr.io/${{ github.repository }}:latest
