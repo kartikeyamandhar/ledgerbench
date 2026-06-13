@@ -1,90 +1,131 @@
+<!-- logo: uncomment when docs/assets/logo.png lands
+<p align="center">
+  <img src="docs/assets/logo.png" alt="LedgerBench" width="320">
+</p>
+-->
+
 # LedgerBench
 
 [![ci](https://github.com/kartikeyamandhar/ledgerbench/actions/workflows/ci.yml/badge.svg)](https://github.com/kartikeyamandhar/ledgerbench/actions/workflows/ci.yml)
+[![PyPI](https://img.shields.io/pypi/v/ledgerbench)](https://pypi.org/project/ledgerbench/)
 [![python](https://img.shields.io/badge/python-3.11%20%7C%203.12-blue)](https://www.python.org/)
 [![license](https://img.shields.io/badge/license-Apache--2.0-green)](LICENSE)
-[![status](https://img.shields.io/badge/status-pre--alpha-orange)](#status)
 
-**LedgerBench measures whether analytics agents are _business-correct_, not merely _execution-correct_.**
+A benchmark and CLI that measures whether analytics agents are business-correct,
+not merely execution-correct.
 
-An AI analyst can write SQL that runs cleanly and returns a confident number that is
-business-wrong: the wrong metric definition, silent double-counting from a fan-out join,
-answering an ambiguous question instead of clarifying, answering an unanswerable question
-instead of refusing, or explaining assumptions that do not match the SQL it actually ran.
-Existing benchmarks (Spider, BIRD) score execution accuracy, which is saturating and no
-longer discriminates. LedgerBench scores the gap between "the query ran fine" and "the
-answer was right" across five axes — and ships the chart that shows it.
+An AI analyst can write SQL that runs cleanly and still returns the wrong answer:
+the wrong metric definition, silent double-counting through a fan-out join, a
+confident answer to an ambiguous question, an invented answer to an unanswerable
+one, or stated assumptions that do not match the query it ran. Execution benchmarks
+(Spider, BIRD) do not measure any of this. LedgerBench does.
 
-## Five scoring axes
+## Results
 
-1. **Definitional correctness** — numeric reconciliation to gold within tolerance.
-2. **Grain safety** — static analysis of the agent's SQL against declared grains; catches fan-out double-counting.
-3. **Ambiguity handling** — the agent must clarify when the question is underspecified.
-4. **Refusal correctness** — the agent must refuse when the question is unanswerable, naming what is missing.
-5. **Explanation faithfulness** — stated assumptions must match the executed SQL.
+Every agent tested executes flawlessly. None is reliably business-correct, and
+giving the agent the business rulebook narrows the gap without closing it:
 
-## Two modes, one engine
-
-- **Demo / benchmark** — a bundled deterministic fake company where every true answer is known by construction. The public benchmark.
-- **BYO** — point the engine at a real dbt project, auto-generate the adversarial suite from your declared semantics, compute gold read-only, and grade your agent.
-
-## The finding
-
-Every agent tested executes flawlessly; none is reliably business-correct — and the
-business rulebook helps without coming close to closing the gap
-([committed manifests](benchmark/results/)):
-
-| agent | ran fine | business-correct (closed book) | business-correct (open book) |
+| agent | queries ran fine | business-correct (schema only) | business-correct (schema + rulebook) |
 |---|---|---|---|
 | naive floor | 100% | 9.3% | 9.3% |
-| claude-haiku-4-5 ¹ | 100% | 38.0% | 44.0% |
+| claude-haiku-4-5 | 100% | 38.0% | 44.0% |
 | gpt-4o-mini | 100% | 42.0% | **59.3%** |
 
-The open-book residual — **two in five answers still wrong with the rulebook in hand,
-on queries that all ran cleanly** — is the argument for verification beyond
-documentation. ¹ single seed (credit-constrained); see the report for the
-contract-binding analysis of haiku's open-book malformed cluster.
-**Leaderboard:** https://kartikeyamandhar.github.io/ledgerbench/ ·
-**Technical report:** [docs/report.md](docs/report.md)
+Even with the rulebook in hand, two in five of gpt-4o-mini's answers are wrong on
+queries that all ran cleanly. Every number traces to a committed manifest in
+[benchmark/results](benchmark/results/). Details, caveats, and per-axis analysis:
+the [technical report](docs/report.md) and the
+[leaderboard](https://kartikeyamandhar.github.io/ledgerbench/).
 
-## Status
+## Installation
 
-v1.0.0 — all eight phases complete: deterministic worlds, frozen contracts, the
-golden-tested five-axis scorer, the fail-closed grain checker (TPR 1.000 / FPR 0.000 on
-its published corpus), the SELECT-only sandboxed runner with kill-tests, the 150-item
-bank with recipe-derived gold, the five-minute demo, BYO/dbt mode
-([guide](docs/byo.md)), and release packaging.
+```bash
+pip install ledgerbench
+```
 
-## Quickstart
-
-From a checkout (PyPI packaging lands in Phase 8):
+The demo needs the bundled worlds and item bank, so run it from a checkout
+(or use the Docker image, which bundles them):
 
 ```bash
 git clone https://github.com/kartikeyamandhar/ledgerbench && cd ledgerbench
-python3.11 -m venv agentic_flow && source agentic_flow/bin/activate
-pip install -e .
-ledgerbench demo          # ~35s: builds both worlds, runs the offline baseline, opens the report
+pip install ledgerbench
+ledgerbench demo
 ```
-
-No API keys, no network. The demo runs the deterministic naive baseline over all 150
-items and renders the headline finding: on our machine, **100% of its queries ran fine
-and 9% of its answers were business-correct**. That gap is the benchmark's point.
-
-Other commands: `ledgerbench run -c ledgerbench.yaml` (config-driven, exit code 1 on
-axis-threshold breach — the CI gate), `ledgerbench report` (re-render/re-score from
-traces, no model calls), `ledgerbench validate` (lint the item bank, recompute gold),
-`ledgerbench world build`.
-
-### Develop
 
 ```bash
-python3.11 -m venv agentic_flow
-source agentic_flow/bin/activate
+docker run --rm ghcr.io/kartikeyamandhar/ledgerbench:latest
+```
+
+## Quickstart
+
+`ledgerbench demo` takes about 35 seconds, needs no API keys, and touches no
+network. It builds two deterministic company databases, runs an offline baseline
+agent over all 150 benchmark items, scores five axes, and opens a single-file
+HTML report:
+
+![Demo report: the gap chart and per-axis results](docs/assets/demo-report.png)
+
+## Commands
+
+| command | what it does |
+|---|---|
+| `ledgerbench demo` | the offline end-to-end demo above |
+| `ledgerbench run -c ledgerbench.yaml` | config-driven benchmark run; exit code 1 on any axis-threshold breach, so it works as a CI gate |
+| `ledgerbench report --traces ... --manifest ...` | re-render and re-score a past run from its traces, with zero model calls |
+| `ledgerbench validate` | lint the item bank, including recomputing every gold value from the rulebook |
+| `ledgerbench world build` | build the bundled world databases locally |
+| `ledgerbench generate` / `ledgerbench review` | BYO mode: generate a suite from your dbt project, then approve it |
+
+## How it works
+
+Questions are scored on five independent axes:
+
+| axis | method |
+|---|---|
+| definitional correctness | numeric reconciliation against gold derived mechanically from a declared rulebook; relative tolerance 0.5%, integer counts exact |
+| grain safety | static analysis of the agent's SQL against declared join cardinalities; catches fan-out double counting without executing anything; fails closed to `unknown` |
+| ambiguity handling | the agent must ask for clarification and name the ambiguous term |
+| refusal correctness | the agent must refuse unanswerable questions and name the missing dimension |
+| explanation faithfulness | stated assumptions checked against facts extracted from the SQL; the only axis that uses an LLM judge, double-run with agreement required and calibrated at 0.90 against a hand-labeled set |
+
+Ground truth is constructed, not judged: each world is generated from a seed and
+governed by a rulebook (metric definitions, exclusions, grains, fiscal calendar,
+timezones). Items carry gold recipes, never baked values, so gold recomputes from
+the rulebook in CI on every run. No model is involved in gold.
+
+Agent SQL executes behind a SELECT-only gate on read-only connections with
+statement timeouts and row caps. A 30-fixture kill-test corpus asserts that
+blocked SQL never reaches the engine. See [SECURITY.md](SECURITY.md).
+
+## Bring your own dbt project
+
+Point the same engine at a real project: parse the manifest, generate an
+adversarial suite from your declared semantics only (nothing is fabricated, no
+LLM in the generation path), review the generated items, compute gold read-only
+on your warehouse, and grade your agent. See the [BYO guide](docs/byo.md).
+
+```bash
+ledgerbench generate --manifest target/manifest.json \
+    --warehouse duckdb:////path/to/warehouse.duckdb --out generated.jsonl
+ledgerbench review generated.jsonl --out approved.jsonl
+```
+
+## Development
+
+```bash
+python3.11 -m venv agentic_flow && source agentic_flow/bin/activate
 pip install -e ".[dev]"
 pre-commit install
-make check                # format check + lint + type + tests with coverage gate
+make check        # format check, lint, types, tests, coverage gates
 ```
+
+Adapters for new agents are about 100 lines and need no fork: see
+[CONTRIBUTING.md](CONTRIBUTING.md).
+
+## Citation
+
+If you use LedgerBench in research, see [CITATION.cff](CITATION.cff).
 
 ## License
 
-Apache-2.0. Copyright © 2026 Kartikeya Mandhar. See [LICENSE](LICENSE).
+Apache-2.0. Copyright 2026 Kartikeya Mandhar. See [LICENSE](LICENSE).
