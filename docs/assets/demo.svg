@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="740" height="300" viewBox="0 0 740 300" font-family="SFMono-Regular, Menlo, Consolas, monospace" font-size="14">
+  <style>
+    .ln { opacity: 0; animation: reveal 0.01s linear forwards; }
+    @keyframes reveal { to { opacity: 1; } }
+    .cur { animation: blink 1s step-end infinite 6.6s; opacity: 0; }
+    @keyframes blink { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0; } }
+  </style>
+  <rect width="740" height="300" rx="10" fill="#1b1d23"/>
+  <circle cx="22" cy="22" r="6" fill="#ff5f57"/>
+  <circle cx="44" cy="22" r="6" fill="#febc2e"/>
+  <circle cx="66" cy="22" r="6" fill="#28c840"/>
+  <text x="370" y="27" text-anchor="middle" fill="#7a7d85" font-size="12">ledgerbench demo</text>
+    <text x="24" y="64" class="ln" style="animation-delay:0.3s" fill="#e8e8e8">$ pip install ledgerbench</text>
+  <text x="24" y="90" class="ln" style="animation-delay:1.4s" fill="#e8e8e8">$ ledgerbench demo</text>
+  <text x="24" y="116" class="ln" style="animation-delay:2.2s" fill="#9e9e9e">building world finance (seed 42) ...</text>
+  <text x="24" y="142" class="ln" style="animation-delay:3.0s" fill="#9e9e9e">building world saas (seed 42) ...</text>
+  <text x="24" y="168" class="ln" style="animation-delay:3.8s" fill="#9e9e9e">running naive adapter on 150 items (open book) ...</text>
+  <text x="24" y="194" class="ln" style="animation-delay:4.0s" fill="#9e9e9e"></text>
+  <text x="24" y="220" class="ln" style="animation-delay:5.0s" fill="#69db7c">demo complete: ran fine 100% vs business-correct 9%</text>
+  <text x="24" y="246" class="ln" style="animation-delay:5.8s" fill="#74c0fc">report: .ledgerbench/demo/report.html  (152 KiB)</text>
+  <text x="24" y="272" fill="#e8e8e8">$ <tspan class="cur">▌</tspan></text>
+</svg>
