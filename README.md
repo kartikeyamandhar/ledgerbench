@@ -78,6 +78,8 @@ HTML report:
 
 ## How it works
 
+![System architecture: dataset to agent to scorer to results](docs/assets/architecture.jpg)
+
 Questions are scored on five independent axes:
 
 | axis | method |
@@ -87,6 +89,8 @@ Questions are scored on five independent axes:
 | ambiguity handling | the agent must ask for clarification and name the ambiguous term |
 | refusal correctness | the agent must refuse unanswerable questions and name the missing dimension |
 | explanation faithfulness | stated assumptions checked against facts extracted from the SQL; the only axis that uses an LLM judge, double-run with agreement required and calibrated at 0.90 against a hand-labeled set |
+
+![The five-axis scorer and the trap each axis catches](docs/assets/five-axis-scorer.jpg)
 
 Ground truth is constructed, not judged: each world is generated from a seed and
 governed by a rulebook (metric definitions, exclusions, grains, fiscal calendar,
